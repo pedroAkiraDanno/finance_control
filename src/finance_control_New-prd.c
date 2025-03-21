@@ -536,6 +536,7 @@ POSTGRESQL:
             -- Insert initial data for payment methods
             INSERT INTO payment_methods (method) VALUES
             ('Cash'),
+            ('Pix')            
             ('Credit Card'),
             ('Debit Card');
 
