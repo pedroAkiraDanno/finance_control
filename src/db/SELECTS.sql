@@ -46,3 +46,23 @@ WHERE id = '2';
 
 
 
+
+
+
+
+
+
+
+pg_dump -U postgres -h localhost -p 5432 -F c -b -v -f "C:\Users\Akira\Documents\finances.backup" finances
+
+
+
+createdb -U postgres -h localhost -p 5432 finances_Homolog
+
+pg_restore -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\Users\Akira\Documents\finances.backup"
+
+
+
+
+
+
