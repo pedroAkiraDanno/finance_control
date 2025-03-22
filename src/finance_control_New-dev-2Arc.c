@@ -61,10 +61,10 @@ void printMenu() {
     printf("10. Add Bank Company\n");
     printf("11. Add Account\n");
     printf("12. View Accounts\n");
-    printf("13. View Bank Companies\n"); // New option
-    printf("14. Exit\n");
+    printf("13. View Bank Companies\n");
+    printf("14. View User Sessions\n"); // New option
+    printf("15. Exit\n");
 }
-
 
 // Function to get the current date in YYYY-MM-DD format
 void getCurrentDate(char *date) {
@@ -241,9 +241,67 @@ void viewBankCompanies(PGconn *conn) {
 
 
 
+// Function to record login
+int recordLogin(PGconn *conn, int user_id) {
+    char query[256];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO user_sessions (user_id, login_time) VALUES (%d, CURRENT_TIMESTAMP)", 
+             user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Login recording failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return 0; // Failure
+    }
+    PQclear(res);
+    return 1; // Success
+}
+
+// Function to record logout
+int recordLogout(PGconn *conn, int session_id) {
+    char query[256];
+    snprintf(query, sizeof(query), 
+             "UPDATE user_sessions SET logout_time = CURRENT_TIMESTAMP WHERE id = %d", 
+             session_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Logout recording failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return 0; // Failure
+    }
+    PQclear(res);
+    return 1; // Success
+}
 
 
 
+void viewUserSessions(PGconn *conn) {
+    const char *query = "SELECT id, user_id, login_time, logout_time FROM user_sessions ORDER BY login_time DESC";
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No user sessions found.\n");
+    } else {
+        printf("ID | User ID | Login Time           | Logout Time\n");
+        printf("-------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-7s | %-20s | %s\n",
+                   PQgetvalue(res, i, 0), // ID
+                   PQgetvalue(res, i, 1), // User ID
+                   PQgetvalue(res, i, 2), // Login Time
+                   PQgetvalue(res, i, 3)); // Logout Time
+        }
+    }
+    PQclear(res);
+}
 
 
 // Function to add income
@@ -306,6 +364,10 @@ void viewTransactions(PGconn *conn) {
     }
     PQclear(res);
 }
+
+
+
+
 
 
 
@@ -481,6 +543,24 @@ int main() {
     char company_name[100], company_location[100];
     char date_record[11]; // YYYY-MM-DD format
     int account_id; // Add this line to declare account_id
+
+    // Record login
+    int user_id = 1; // Replace with the actual user ID or logic to get the user ID
+    int session_id = -1; // To store the session ID for logout
+    
+    if (recordLogin(conn, user_id)) {
+        // Fetch the session ID of the newly created login record
+        const char *query = "SELECT currval('user_sessions_id_seq')";
+        PGresult *res = PQexec(conn, query);
+        if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+            session_id = atoi(PQgetvalue(res, 0, 0));
+        }
+        PQclear(res);
+    } else {
+        fprintf(stderr, "Failed to record login. Exiting...\n");
+        PQfinish(conn);
+        return 1;
+    }    
 
     while (1) {
         clearScreen();
@@ -661,16 +741,28 @@ int main() {
                 viewBankCompanies(conn);
                 break;
 
-            case 14: // Exit
-                PQfinish(conn);
-                exit(0);
-
-            default:
-                printf("Invalid choice. Please try again.\n");
+                switch (choice) {
+                    // ... (existing cases)
+                    case 14: // Exit
+                        // Record logout before exiting
+                        if (session_id != -1) {
+                            if (!recordLogout(conn, session_id)) {
+                                fprintf(stderr, "Failed to record logout.\n");
+                            }
+                        }
+                        PQfinish(conn);
+                        exit(0);
+        
+                    default:
+                        printf("Invalid choice. Please try again.\n");
+                }
+                printf("Press Enter to continue...");
+                getchar(); getchar(); // Wait for Enter key
+            }
+        
+            PQfinish(conn);
+            return 0;
         }
-        printf("Press Enter to continue...");
-        getchar(); getchar(); // Wait for Enter key
-    }
 
     PQfinish(conn);
     return 0;
@@ -857,6 +949,12 @@ POSTGRESQL:
 
 
 
+            CREATE TABLE user_sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL, -- Assuming you have a users table; otherwise, adjust accordingly
+                login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                logout_time TIMESTAMP
+            );            
 
 
 
@@ -1588,6 +1686,7 @@ LINUX preparation:
 
 
 */
+
 
 
 

@@ -13,38 +13,40 @@ SELECT * FROM "categories_income"
 
 
 
-credit_cards
-1	"Inter Card"	4540.00	22	22
-2	"C6 Card"	4940.11	29	5
-3	"Mercado Pago Card"	4100.00	29	4
-
-
-
-account
-1	"Mercado Pago Account"	0.00	17
-2	"Itau Account"	0.00	4
-3	"C6 Bank Account"	0.00	25
-4	"Inter"	0.00	15
-5	"My Wallet"	0.00	1
+SELECT * FROM "transactions";
 
 
 
 
 
 
+SELECT * FROM "transactions";
 
 
-            ('Cash'),   
-            ('Credit Card'),
-            ('Debit Card'),
-            ('Pix');  
-		
-UPDATE payment_methods
-SET method = 'Credit Card'
-WHERE id = '2';
+SELECT SUM(amount) as all_Sum FROM "transactions" ;
 
 
 
+SELECT SUM(amount) AS all_Sum
+FROM "transactions"
+WHERE EXTRACT(MONTH FROM date_record) = 3
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
+
+
+
+SELECT SUM(amount) AS all_Sum
+FROM "transactions"
+WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
+
+
+
+
+SELECT SUM(amount) AS all_Sum
+FROM "transactions"
+WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
+  AND is_repeated='TRUE';
 
 
 
@@ -53,6 +55,7 @@ WHERE id = '2';
 
 
 
+-- CREATE\UPDATE HOMOLOG DATABASE
 pg_dump -U postgres -h localhost -p 5432 -F c -b -v -f "C:\Users\Akira\Documents\finances.backup" finances
 
 
