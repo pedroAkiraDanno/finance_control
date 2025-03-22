@@ -37,6 +37,7 @@ void viewIncomeCategories(PGconn *conn);
 void viewPaymentMethods(PGconn *conn);
 void viewCreditCards(PGconn *conn);
 void addCreditCard(PGconn *conn);
+void displayIntroduction() ;
 
 // Function to clear the screen
 void clearScreen() {
@@ -46,6 +47,31 @@ void clearScreen() {
     system("clear");
     #endif
 }
+
+
+
+
+
+// Function to display the introduction screen
+void displayIntroduction() {
+    clearScreen();
+    printf("\n\n");
+    printf("   __   _                                  _           _                            _                    _ \n");
+    printf("  / _| (_)  _ __     __ _   _ __     ___  (_)   __ _  | |     ___    ___    _ __   | |_   _ __    ___   | |\n");
+    printf(" | |_  | | | '_ \\   / _` | | '_ \\   / __| | |  / _` | | |    / __|  / _ \\  | '_ \\  | __| | '__|  / _ \\  | |\n");
+    printf(" |  _| | | | | | | | (_| | | | | | | (__  | | | (_| | | |   | (__  | (_) | | | | | | |_  | |    | (_) | | |\n");
+    printf(" |_|   |_| |_| |_|  \\__,_| |_| |_|  \\___| |_|  \\__,_| |_|    \\___|  \\___/  |_| |_|  \\__| |_|     \\___/  |_|\n");
+    printf("\n\n");
+    printf("Financial Control\n");
+    printf("Created by Pedro Akira, with C and PostgreSQL\n");
+    printf("\n\n");
+    printf("Press Enter to continue...");
+    getchar(); // Wait for Enter key
+}
+
+
+
+
 
 // Function to print the menu
 void printMenu() {
@@ -470,6 +496,9 @@ int main() {
         PQfinish(conn);
         return 1;
     }
+
+    // Display the introduction screen
+    displayIntroduction();    
 
     // Detect and display the operating system
     detectOS();

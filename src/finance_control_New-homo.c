@@ -30,8 +30,7 @@ void getCurrentDate(char *date);
 void detectOS();
 void addTransaction(PGconn *conn, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id);
 void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record);
-void viewTransactions(PGconn *conn);
-void viewIncome(PGconn *conn);
+void viewTransactions(PGconn *conn, int user_id); // Add user_id parametervoid viewIncome(PGconn *conn);
 void viewCategories(PGconn *conn);
 void viewIncomeCategories(PGconn *conn);
 void viewPaymentMethods(PGconn *conn);
@@ -90,6 +89,15 @@ void printMenu() {
     printf("13. View Bank Companies\n"); // New option
     printf("14. Exit\n");
 }
+
+
+
+
+
+
+
+
+
 
 
 // Function to get the current date in YYYY-MM-DD format
@@ -293,14 +301,18 @@ void addIncome(PGconn *conn, const char *description, float amount, int category
 
 
 
-void viewTransactions(PGconn *conn) {
-    const char *query = "SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, t.date_record, t.date, cc.card_name, t.is_repeated "
-                        "FROM transactions t "
-                        "LEFT JOIN categories c ON t.category_id = c.id "
-                        "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
-                        "LEFT JOIN companies co ON t.company_id = co.id "
-                        "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
-                        "ORDER BY t.date DESC";
+void viewTransactions(PGconn *conn, int user_id) {
+    char query[512];
+    snprintf(query, sizeof(query),
+             "SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, t.date_record, t.date, cc.card_name, t.is_repeated "
+             "FROM transactions t "
+             "LEFT JOIN categories c ON t.category_id = c.id "
+             "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
+             "LEFT JOIN companies co ON t.company_id = co.id "
+             "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
+             "WHERE t.user_id = %d "
+             "ORDER BY t.date DESC", user_id);
+
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
@@ -487,6 +499,93 @@ void addCreditCard(PGconn *conn) {
     printf("Credit card added successfully!\n");
 }
 
+
+
+
+
+
+
+
+
+
+
+
+// Function to register a new user
+void registerUser(PGconn *conn) {
+    char name[100], password[100], email[100], profession[100];
+    int age;
+
+    printf("Enter your name: ");
+    scanf(" %[^\n]", name);
+    printf("Enter your password: ");
+    scanf(" %[^\n]", password);
+    printf("Enter your age: ");
+    scanf("%d", &age);
+    printf("Enter your profession: ");
+    scanf(" %[^\n]", profession);
+    printf("Enter your email: ");
+    scanf(" %[^\n]", email);
+
+    char query[512];
+    snprintf(query, sizeof(query),
+             "INSERT INTO users (name, password, age, profession, email) "
+             "VALUES ('%s', '%s', %d, '%s', '%s')",
+             name, password, age, profession, email);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "User registration failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("User registered successfully!\n");
+}
+
+// Function to log in a user
+int loginUser(PGconn *conn, int *user_id) {
+    char email[100], password[100];
+
+    printf("Enter your email: ");
+    scanf(" %[^\n]", email);
+    printf("Enter your password: ");
+    scanf(" %[^\n]", password);
+
+    char query[256];
+    snprintf(query, sizeof(query),
+             "SELECT id FROM users WHERE email = '%s' AND password = '%s'",
+             email, password);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Login failed: Invalid email or password\n");
+        PQclear(res);
+        return 0; // Login failed
+    }
+
+    *user_id = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    printf("Login successful! User ID: %d\n", *user_id);
+    return 1; // Login successful
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int main() {
     const char *conninfo = "dbname=finances_Homolog user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
@@ -499,6 +598,36 @@ int main() {
 
     // Display the introduction screen
     displayIntroduction();    
+
+
+
+
+
+    // Login or register
+    int user_id = -1;
+    while (user_id == -1) {
+        printf("1. Register\n");
+        printf("2. Login\n");
+        printf("Enter your choice: ");
+        int auth_choice;
+        scanf("%d", &auth_choice);
+
+        if (auth_choice == 1) {
+            registerUser(conn);
+        } else if (auth_choice == 2) {
+            if (loginUser(conn, &user_id)) {
+                break; // Exit loop on successful login
+            }
+        } else {
+            printf("Invalid choice. Please try again.\n");
+        }
+    }
+
+
+
+
+
+
 
     // Detect and display the operating system
     detectOS();
@@ -646,7 +775,8 @@ int main() {
                 addTransaction(conn, title, description, amount, "expense", category_id, payment_method_id, company_name, company_location, date_record, credit_card_id, is_repeated, account_id);
                 break;
             case 3: // View Transactions
-                viewTransactions(conn);
+                viewTransactions(conn, user_id); // Pass user_id
+                break;
                 break;
             case 4: // View Income
                 viewIncome(conn);
@@ -884,6 +1014,25 @@ POSTGRESQL:
             INSERT INTO credit_cards (card_name, credit_limit, closes_on_day, due_day) VALUES  ('Inter Card', 4540.00, 22, 28), ('C6 Card', 4940.11, 29, 5), ('Mercado Pago Card', 4100.00, 29, 4);
             INSERT INTO account (title_account, balance, banks_company_id) VALUES ('Mercado Pago Account', 0.00, 17), ('Itau Account', 0.00, 4), ('C6 Bank Account', 0.00, 25), ('Inter', 0.00, 15), ('My Wallet', 0.00, 1);
 
+
+
+
+
+            -- Users table
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                age INT,
+                profession VARCHAR(100),
+                email VARCHAR(100) UNIQUE NOT NULL
+            );
+
+            -- Add user_id to transactions table
+            ALTER TABLE transactions ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
+
+            -- Add user_id to account table
+            ALTER TABLE account ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
 
 
 
