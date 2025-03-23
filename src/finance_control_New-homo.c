@@ -27,7 +27,7 @@
 void clearScreen();
 void printMenu();
 void getCurrentDate(char *date);
-void detectOS();
+void detect_os();
 void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id);
 void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record);
 void viewTransactions(PGconn *conn, int user_id);
@@ -117,14 +117,17 @@ void getCurrentDate(char *date) {
     sprintf(date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
+
 // Function to detect the operating system
-void detectOS() {
+void detect_os() {
     #ifdef _WIN32
-    printf("Operating System: Windows\n");
+        printf("Operating System: Windows\n");
     #else
-    printf("Operating System: Linux\n");
+        printf("Operating System: Linux\n");
     #endif
 }
+
+
 
 void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id) {
     char query[512];
@@ -611,6 +614,8 @@ int main() {
         return 1;
     }
 
+
+
     // Display the introduction screen
     displayIntroduction();    
 
@@ -641,8 +646,9 @@ int main() {
 
 
 
-    // Detect and display the operating system
-    detectOS();
+
+   
+
 
     int choice;
     char description[100];
@@ -654,6 +660,8 @@ int main() {
 
     while (1) {
         clearScreen();
+        // Detect and display the operating system
+        detect_os();         
         printMenu();
         printf("Enter your choice: ");
         scanf("%d", &choice);
@@ -1024,7 +1032,7 @@ POSTGRESQL:
 
             -- OPTION TO PUT 
             INSERT INTO credit_cards (card_name, credit_limit, closes_on_day, due_day) VALUES  ('Inter Card', 4540.00, 22, 28), ('C6 Card', 4940.11, 29, 5), ('Mercado Pago Card', 4100.00, 29, 4);
-            INSERT INTO account (title_account, balance, banks_company_id) VALUES ('Mercado Pago Account', 0.00, 17), ('Itau Account', 0.00, 4), ('C6 Bank Account', 0.00, 25), ('Inter', 0.00, 15), ('My Wallet', 0.00, 1);
+            -- INSERT INTO account (title_account, balance, banks_company_id) VALUES ('Mercado Pago Account', 0.00, 17), ('Itau Account', 0.00, 4), ('C6 Bank Account', 0.00, 25), ('Inter', 0.00, 15), ('My Wallet', 0.00, 1);
 
 
 
