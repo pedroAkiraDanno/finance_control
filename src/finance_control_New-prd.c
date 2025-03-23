@@ -27,16 +27,26 @@
 void clearScreen();
 void printMenu();
 void getCurrentDate(char *date);
-void detectOS();
-void addTransaction(PGconn *conn, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id);
+void detect_os();
+void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id);
 void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record);
-void viewTransactions(PGconn *conn);
+void viewTransactions(PGconn *conn, int user_id);
 void viewIncome(PGconn *conn);
 void viewCategories(PGconn *conn);
 void viewIncomeCategories(PGconn *conn);
 void viewPaymentMethods(PGconn *conn);
 void viewCreditCards(PGconn *conn);
 void addCreditCard(PGconn *conn);
+void displayIntroduction();
+void registerUser(PGconn *conn);
+int loginUser(PGconn *conn, int *user_id);
+void addBankCompany(PGconn *conn, const char *name, const char *location); // Add this
+void viewBankCompanies(PGconn *conn); // Add this
+void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id); // Update this
+void viewAccounts(PGconn *conn, int user_id); // Update this
+
+
+
 
 // Function to clear the screen
 void clearScreen() {
@@ -46,6 +56,31 @@ void clearScreen() {
     system("clear");
     #endif
 }
+
+
+
+
+
+// Function to display the introduction screen
+void displayIntroduction() {
+    clearScreen();
+    printf("\n\n");
+    printf("   __   _                                  _           _                            _                    _ \n");
+    printf("  / _| (_)  _ __     __ _   _ __     ___  (_)   __ _  | |     ___    ___    _ __   | |_   _ __    ___   | |\n");
+    printf(" | |_  | | | '_ \\   / _` | | '_ \\   / __| | |  / _` | | |    / __|  / _ \\  | '_ \\  | __| | '__|  / _ \\  | |\n");
+    printf(" |  _| | | | | | | | (_| | | | | | | (__  | | | (_| | | |   | (__  | (_) | | | | | | |_  | |    | (_) | | |\n");
+    printf(" |_|   |_| |_| |_|  \\__,_| |_| |_|  \\___| |_|  \\__,_| |_|    \\___|  \\___/  |_| |_|  \\__| |_|     \\___/  |_|\n");
+    printf("\n\n");
+    printf("Financial Control\n");
+    printf("Created by Pedro Akira, with C and PostgreSQL\n");
+    printf("\n\n");
+    printf("Press Enter to continue...");
+    getchar(); // Wait for Enter key
+}
+
+
+
+
 
 // Function to print the menu
 void printMenu() {
@@ -66,6 +101,15 @@ void printMenu() {
 }
 
 
+
+
+
+
+
+
+
+
+
 // Function to get the current date in YYYY-MM-DD format
 void getCurrentDate(char *date) {
     time_t t = time(NULL);
@@ -73,18 +117,19 @@ void getCurrentDate(char *date) {
     sprintf(date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
+
 // Function to detect the operating system
-void detectOS() {
+void detect_os() {
     #ifdef _WIN32
-    printf("Operating System: Windows\n");
+        printf("Operating System: Windows\n");
     #else
-    printf("Operating System: Linux\n");
+        printf("Operating System: Linux\n");
     #endif
 }
 
 
 
-void addTransaction(PGconn *conn, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id) {
+void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, int credit_card_id, int is_repeated, int account_id) {
     char query[512];
     char account_id_str[20]; // Buffer to hold the account_id as a string or "NULL"
 
@@ -99,15 +144,15 @@ void addTransaction(PGconn *conn, const char *title, const char *description, fl
         // If company name is empty, insert NULL for company_id
         if (payment_method_id == 2) { // Credit Card
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated, account_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', %d, %s, %s)", 
-                     title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', %d, %s, %s, %d)", 
+                     title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         } else {
             // For non-credit card payments, set credit_card_id to NULL
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated, account_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', NULL, %s, %s)", 
-                     title, description, amount, type, category_id, payment_method_id, date_record, is_repeated ? "TRUE" : "FALSE", account_id_str);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', NULL, %s, %s, %d)", 
+                     title, description, amount, type, category_id, payment_method_id, date_record, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         }
     } else {
         // Insert company if it doesn't exist
@@ -126,15 +171,15 @@ void addTransaction(PGconn *conn, const char *title, const char *description, fl
         // Insert transaction with company_id
         if (payment_method_id == 2) { // Credit Card
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, credit_card_id, is_repeated, account_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', %d, %s, %s)", 
-                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', %d, %s, %s, %d)", 
+                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         } else {
             // For non-credit card payments, set credit_card_id to NULL
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, credit_card_id, is_repeated, account_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', NULL, %s, %s)", 
-                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, is_repeated ? "TRUE" : "FALSE", account_id_str);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', NULL, %s, %s, %d)", 
+                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         }
     }
 
@@ -150,30 +195,13 @@ void addTransaction(PGconn *conn, const char *title, const char *description, fl
 
 
 
-
 // Function to add a bank company
-void addBankCompany(PGconn *conn, const char *name, const char *location) {
+void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id) {
     char query[256];
     snprintf(query, sizeof(query), 
-             "INSERT INTO banks_company (name, location) VALUES ('%s', '%s')", 
-             name, location);
-
-    PGresult *res = PQexec(conn, query);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        fprintf(stderr, "Bank company insertion failed: %s", PQerrorMessage(conn));
-        PQclear(res);
-        return;
-    }
-    PQclear(res);
-    printf("Bank company added successfully!\n");
-}
-
-// Function to add an account
-void addAccount(PGconn *conn, const char *title_account, float balance, int banks_company_id) {
-    char query[256];
-    snprintf(query, sizeof(query), 
-             "INSERT INTO account (title_account, balance, banks_company_id) VALUES ('%s', %.2f, %d)", 
-             title_account, balance, banks_company_id);
+             "INSERT INTO account (title_account, balance, banks_company_id, user_id) "
+             "VALUES ('%s', %.2f, %d, %d)", 
+             title_account, balance, banks_company_id, user_id);
 
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -185,9 +213,24 @@ void addAccount(PGconn *conn, const char *title_account, float balance, int bank
     printf("Account added successfully!\n");
 }
 
-// Function to view accounts
-void viewAccounts(PGconn *conn) {
-    const char *query = "SELECT a.id, a.title_account, a.balance, b.name AS bank_name FROM account a LEFT JOIN banks_company b ON a.banks_company_id = b.id ORDER BY a.id";
+
+
+
+
+
+
+
+
+// Function to view bank companies
+void viewAccounts(PGconn *conn, int user_id) {
+    char query[512];
+    snprintf(query, sizeof(query),
+             "SELECT a.id, a.title_account, a.balance, b.name AS bank_name "
+             "FROM account a "
+             "LEFT JOIN banks_company b ON a.banks_company_id = b.id "
+             "WHERE a.user_id = %d "
+             "ORDER BY a.id", user_id);
+
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
@@ -204,37 +247,6 @@ void viewAccounts(PGconn *conn) {
                PQgetvalue(res, i, 1),
                PQgetvalue(res, i, 2),
                PQgetvalue(res, i, 3));
-    }
-    PQclear(res);
-}
-
-
-
-
-
-// Function to view bank companies
-void viewBankCompanies(PGconn *conn) {
-    const char *query = "SELECT id, name, location FROM banks_company ORDER BY id";
-    PGresult *res = PQexec(conn, query);
-
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
-        PQclear(res);
-        return;
-    }
-
-    int rows = PQntuples(res);
-    if (rows == 0) {
-        printf("No bank companies found.\n");
-    } else {
-        printf("ID | Bank Name         | Location\n");
-        printf("---------------------------------\n");
-        for (int i = 0; i < rows; i++) {
-            printf("%s | %-17s | %s\n",
-                   PQgetvalue(res, i, 0), // ID
-                   PQgetvalue(res, i, 1), // Name
-                   PQgetvalue(res, i, 2)); // Location
-        }
     }
     PQclear(res);
 }
@@ -267,14 +279,18 @@ void addIncome(PGconn *conn, const char *description, float amount, int category
 
 
 
-void viewTransactions(PGconn *conn) {
-    const char *query = "SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, t.date_record, t.date, cc.card_name, t.is_repeated "
-                        "FROM transactions t "
-                        "LEFT JOIN categories c ON t.category_id = c.id "
-                        "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
-                        "LEFT JOIN companies co ON t.company_id = co.id "
-                        "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
-                        "ORDER BY t.date DESC";
+void viewTransactions(PGconn *conn, int user_id) {
+    char query[512];
+    snprintf(query, sizeof(query),
+             "SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, t.date_record, t.date, cc.card_name, t.is_repeated "
+             "FROM transactions t "
+             "LEFT JOIN categories c ON t.category_id = c.id "
+             "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
+             "LEFT JOIN companies co ON t.company_id = co.id "
+             "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
+             "WHERE t.user_id = %d "
+             "ORDER BY t.date DESC", user_id);
+
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
@@ -461,6 +477,133 @@ void addCreditCard(PGconn *conn) {
     printf("Credit card added successfully!\n");
 }
 
+
+
+
+
+
+void addBankCompany(PGconn *conn, const char *name, const char *location) {
+    char query[256];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO banks_company (name, location) VALUES ('%s', '%s')", 
+             name, location);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Bank company insertion failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Bank company added successfully!\n");
+}
+
+void viewBankCompanies(PGconn *conn) {
+    const char *query = "SELECT id, name, location FROM banks_company ORDER BY id";
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No bank companies found.\n");
+    } else {
+        printf("ID | Bank Name         | Location\n");
+        printf("---------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-17s | %s\n",
+                   PQgetvalue(res, i, 0), // ID
+                   PQgetvalue(res, i, 1), // Name
+                   PQgetvalue(res, i, 2)); // Location
+        }
+    }
+    PQclear(res);
+}
+
+
+
+
+
+// Function to register a new user
+void registerUser(PGconn *conn) {
+    char name[100], password[100], email[100], profession[100];
+    int age;
+
+    printf("Enter your name: ");
+    scanf(" %[^\n]", name);
+    printf("Enter your password: ");
+    scanf(" %[^\n]", password);
+    printf("Enter your age: ");
+    scanf("%d", &age);
+    printf("Enter your profession: ");
+    scanf(" %[^\n]", profession);
+    printf("Enter your email: ");
+    scanf(" %[^\n]", email);
+
+    char query[512];
+    snprintf(query, sizeof(query),
+             "INSERT INTO users (name, password, age, profession, email) "
+             "VALUES ('%s', '%s', %d, '%s', '%s')",
+             name, password, age, profession, email);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "User registration failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("User registered successfully!\n");
+}
+
+// Function to log in a user
+int loginUser(PGconn *conn, int *user_id) {
+    char email[100], password[100];
+
+    printf("Enter your email: ");
+    scanf(" %[^\n]", email);
+    printf("Enter your password: ");
+    scanf(" %[^\n]", password);
+
+    char query[256];
+    snprintf(query, sizeof(query),
+             "SELECT id FROM users WHERE email = '%s' AND password = '%s'",
+             email, password);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Login failed: Invalid email or password\n");
+        PQclear(res);
+        return 0; // Login failed
+    }
+
+    *user_id = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    printf("Login successful! User ID: %d\n", *user_id);
+    return 1; // Login successful
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int main() {
     const char *conninfo = "dbname=finances user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
@@ -471,8 +614,41 @@ int main() {
         return 1;
     }
 
-    // Detect and display the operating system
-    detectOS();
+
+
+    // Display the introduction screen
+    displayIntroduction();    
+
+
+
+
+
+    // Login or register
+    int user_id = -1; // Declare user_id
+    while (user_id == -1) {
+        printf("1. Register\n");
+        printf("2. Login\n");
+        printf("Enter your choice: ");
+        int auth_choice;
+        scanf("%d", &auth_choice);
+    
+        if (auth_choice == 1) {
+            registerUser(conn);
+        } else if (auth_choice == 2) {
+            if (loginUser(conn, &user_id)) {
+                break; // Exit loop on successful login
+            }
+        } else {
+            printf("Invalid choice. Please try again.\n");
+        }
+    }
+
+
+
+
+
+   
+
 
     int choice;
     char description[100];
@@ -484,6 +660,8 @@ int main() {
 
     while (1) {
         clearScreen();
+        // Detect and display the operating system
+        detect_os();         
         printMenu();
         printf("Enter your choice: ");
         scanf("%d", &choice);
@@ -610,14 +788,15 @@ int main() {
                 scanf(" %[^\n]", date_record);
             
                 // Ask for account ID for all payment methods
-                viewAccounts(conn); // Show available accounts
+                viewAccounts(conn, user_id); // Pass user_id
                 printf("Enter account ID (or -1 if not applicable): ");
                 scanf("%d", &account_id); // Get account ID from user
             
-                addTransaction(conn, title, description, amount, "expense", category_id, payment_method_id, company_name, company_location, date_record, credit_card_id, is_repeated, account_id);
+                addTransaction(conn, user_id, title, description, amount, "expense", category_id, payment_method_id, company_name, company_location, date_record, credit_card_id, is_repeated, account_id);
                 break;
             case 3: // View Transactions
-                viewTransactions(conn);
+                viewTransactions(conn, user_id); // Pass user_id
+                break;
                 break;
             case 4: // View Income
                 viewIncome(conn);
@@ -637,13 +816,13 @@ int main() {
             case 9: // Add Credit Card
                 addCreditCard(conn);
                 break;
-                case 10: // Add Bank Company
+            case 10: // Add Bank Company
                 printf("Enter bank name: ");
                 scanf(" %[^\n]", company_name);
                 printf("Enter bank location: ");
                 scanf(" %[^\n]", company_location);
                 addBankCompany(conn, company_name, company_location);
-                break;
+                break;            
             case 11: // Add Account
                 printf("Enter account title: ");
                 scanf(" %[^\n]", description);
@@ -652,15 +831,15 @@ int main() {
                 viewBankCompanies(conn);
                 printf("Enter bank company ID: ");
                 scanf("%d", &category_id);
-                addAccount(conn, description, amount, category_id);
+                addAccount(conn, user_id, description, amount, category_id);
                 break;
+            
             case 12: // View Accounts
-                viewAccounts(conn);
-                break;
+                viewAccounts(conn, user_id); // Pass user_id
+                break;            
             case 13: // View Bank Companies
                 viewBankCompanies(conn);
                 break;
-
             case 14: // Exit
                 PQfinish(conn);
                 exit(0);
@@ -853,8 +1032,27 @@ POSTGRESQL:
 
             -- OPTION TO PUT 
             INSERT INTO credit_cards (card_name, credit_limit, closes_on_day, due_day) VALUES  ('Inter Card', 4540.00, 22, 28), ('C6 Card', 4940.11, 29, 5), ('Mercado Pago Card', 4100.00, 29, 4);
-            INSERT INTO account (title_account, balance, banks_company_id) VALUES ('Mercado Pago Account', 0.00, 17), ('Itau Account', 0.00, 4), ('C6 Bank Account', 0.00, 25), ('Inter', 0.00, 15), ('My Wallet', 0.00, 1);
+            -- INSERT INTO account (title_account, balance, banks_company_id) VALUES ('Mercado Pago Account', 0.00, 17), ('Itau Account', 0.00, 4), ('C6 Bank Account', 0.00, 25), ('Inter', 0.00, 15), ('My Wallet', 0.00, 1);
 
+
+
+
+
+            -- Users table
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                age INT,
+                profession VARCHAR(100),
+                email VARCHAR(100) UNIQUE NOT NULL
+            );
+
+            -- Add user_id to transactions table
+            ALTER TABLE transactions ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
+
+            -- Add user_id to account table
+            ALTER TABLE account ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
 
 
 
@@ -923,6 +1121,19 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
