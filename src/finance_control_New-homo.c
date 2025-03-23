@@ -1721,6 +1721,22 @@ POSTGRESQL:
             ADD COLUMN title VARCHAR(100);
 
 
+            -- Users table
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                age INT,
+                profession VARCHAR(100),
+                email VARCHAR(100) UNIQUE NOT NULL
+            );
+
+            -- Add user_id to transactions table
+            ALTER TABLE transactions ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
+
+            -- Add user_id to account table
+            ALTER TABLE account ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;            
+
 
 
             -- psql -d database -U user
