@@ -44,7 +44,8 @@ void addBankCompany(PGconn *conn, const char *name, const char *location); // Ad
 void viewBankCompanies(PGconn *conn); // Add this
 void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id); // Update this
 void viewAccounts(PGconn *conn, int user_id); // Update this
-
+void recordLoginActivity(PGconn *conn);
+void recordLogoutActivity(PGconn *conn);
 
 
 
@@ -592,6 +593,31 @@ int loginUser(PGconn *conn, int *user_id) {
 
 
 
+// Function to record login activity
+void recordLoginActivity(PGconn *conn) {
+    const char *query = "INSERT INTO user_activity (activity_type) VALUES ('login')";
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Login activity recording failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Login activity recorded successfully!\n");
+}
+
+// Function to record logout activity
+void recordLogoutActivity(PGconn *conn) {
+    const char *query = "INSERT INTO user_activity (activity_type) VALUES ('logout')";
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Logout activity recording failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Logout activity recorded successfully!\n");
+}
 
 
 
@@ -614,7 +640,8 @@ int main() {
         return 1;
     }
 
-
+    // Record login activity
+    recordLoginActivity(conn);
 
     // Display the introduction screen
     displayIntroduction();    
@@ -841,9 +868,10 @@ int main() {
                 viewBankCompanies(conn);
                 break;
             case 14: // Exit
+                // Record logout activity before exiting
+                recordLogoutActivity(conn);            
                 PQfinish(conn);
                 exit(0);
-
             default:
                 printf("Invalid choice. Please try again.\n");
         }
@@ -1055,7 +1083,11 @@ POSTGRESQL:
             ALTER TABLE account ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;
 
 
-
+            CREATE TABLE user_activity (
+                id SERIAL PRIMARY KEY,
+                activity_type VARCHAR(50) NOT NULL, -- 'login' or 'logout'
+                activity_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+            );
 
 
             -- psql -d database -U user
@@ -1736,6 +1768,13 @@ POSTGRESQL:
 
             -- Add user_id to account table
             ALTER TABLE account ADD COLUMN user_id INT REFERENCES users(id) ON DELETE CASCADE;            
+
+
+            CREATE TABLE user_activity (
+                id SERIAL PRIMARY KEY,
+                activity_type VARCHAR(50) NOT NULL, -- 'login' or 'logout'
+                activity_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Time when the activity occurred
+            );
 
 
 
