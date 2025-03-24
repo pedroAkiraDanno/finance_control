@@ -627,9 +627,6 @@ void recordLogoutActivity(PGconn *conn) {
 
 
 
-
-
-
 int main() {
     const char *conninfo = "dbname=finances user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
@@ -645,9 +642,6 @@ int main() {
 
     // Display the introduction screen
     displayIntroduction();    
-
-
-
 
 
     // Login or register
@@ -670,12 +664,7 @@ int main() {
         }
     }
 
-
-
-
-
-   
-
+ 
 
     int choice;
     char description[100];
