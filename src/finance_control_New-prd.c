@@ -44,8 +44,8 @@ void addBankCompany(PGconn *conn, const char *name, const char *location); // Ad
 void viewBankCompanies(PGconn *conn); // Add this
 void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id); // Update this
 void viewAccounts(PGconn *conn, int user_id); // Update this
-void recordLoginActivity(PGconn *conn);
-void recordLogoutActivity(PGconn *conn);
+void recordLoginActivity(PGconn *conn, int user_id);
+void recordLogoutActivity(PGconn *conn, int user_id);
 
 
 
@@ -83,7 +83,6 @@ void displayIntroduction() {
 
 
 
-// Function to print the menu
 void printMenu() {
     printf("1. Add Income (e.g., Salary)\n");
     printf("2. Add Expense\n");
@@ -97,8 +96,9 @@ void printMenu() {
     printf("10. Add Bank Company\n");
     printf("11. Add Account\n");
     printf("12. View Accounts\n");
-    printf("13. View Bank Companies\n"); // New option
-    printf("14. Exit\n");
+    printf("13. View Bank Companies\n");
+    printf("14. View User Activity\n");  // New option
+    printf("15. Exit\n");
 }
 
 
@@ -592,10 +592,13 @@ int loginUser(PGconn *conn, int *user_id) {
 
 
 
-
 // Function to record login activity
-void recordLoginActivity(PGconn *conn) {
-    const char *query = "INSERT INTO user_activity (activity_type) VALUES ('login')";
+void recordLoginActivity(PGconn *conn, int user_id) {
+    char query[256];
+    snprintf(query, sizeof(query),
+             "INSERT INTO user_activity (activity_type, user_id) VALUES ('login', %d)",
+             user_id);
+
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         fprintf(stderr, "Login activity recording failed: %s", PQerrorMessage(conn));
@@ -606,9 +609,17 @@ void recordLoginActivity(PGconn *conn) {
     printf("Login activity recorded successfully!\n");
 }
 
+
+
+
+
 // Function to record logout activity
-void recordLogoutActivity(PGconn *conn) {
-    const char *query = "INSERT INTO user_activity (activity_type) VALUES ('logout')";
+void recordLogoutActivity(PGconn *conn, int user_id) {
+    char query[256];
+    snprintf(query, sizeof(query),
+             "INSERT INTO user_activity (activity_type, user_id) VALUES ('logout', %d)",
+             user_id);
+
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         fprintf(stderr, "Logout activity recording failed: %s", PQerrorMessage(conn));
@@ -627,6 +638,35 @@ void recordLogoutActivity(PGconn *conn) {
 
 
 
+void viewUserActivity(PGconn *conn, int user_id) {
+    char query[512];
+    snprintf(query, sizeof(query),
+             "SELECT id, activity_type, activity_time "
+             "FROM user_activity "
+             "WHERE user_id = %d "
+             "ORDER BY activity_time DESC",
+             user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    printf("ID | Activity Type | Activity Time\n");
+    printf("----------------------------------\n");
+    for (int i = 0; i < rows; i++) {
+        printf("%s | %-13s | %s\n",
+               PQgetvalue(res, i, 0), // ID
+               PQgetvalue(res, i, 1), // Activity Type
+               PQgetvalue(res, i, 2)); // Activity Time
+    }
+    PQclear(res);
+}
+
+
 
 
 
@@ -640,13 +680,9 @@ int main() {
         return 1;
     }
 
-    // Record login activity
-    recordLoginActivity(conn);
 
     // Display the introduction screen
     displayIntroduction();    
-
-
 
 
 
@@ -663,15 +699,14 @@ int main() {
             registerUser(conn);
         } else if (auth_choice == 2) {
             if (loginUser(conn, &user_id)) {
+                // Record login activity after successful login
+                recordLoginActivity(conn, user_id);
                 break; // Exit loop on successful login
             }
         } else {
             printf("Invalid choice. Please try again.\n");
         }
     }
-
-
-
 
 
    
@@ -871,9 +906,12 @@ int main() {
             case 13: // View Bank Companies
                 viewBankCompanies(conn);
                 break;
-            case 14: // Exit
+            case 14: // View User Activity
+                viewUserActivity(conn, user_id);
+                break;
+            case 15: // Exit
                 // Record logout activity before exiting
-                recordLogoutActivity(conn);            
+                recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
                 exit(0);
             default:
@@ -1099,6 +1137,20 @@ POSTGRESQL:
 
 
 
+
+
+            -- Add user_id column to user_activity
+            ALTER TABLE user_activity ADD COLUMN user_id INT;
+
+            -- Add foreign key constraint
+            ALTER TABLE user_activity 
+            ADD CONSTRAINT fk_user_activity_user 
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
@@ -1184,6 +1236,17 @@ LINUX preparation:
 
 
 
+
+
+
+
+
+
+
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
