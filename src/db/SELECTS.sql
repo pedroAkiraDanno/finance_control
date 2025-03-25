@@ -55,7 +55,7 @@ WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
 
 
 
-SELECT SUM(amount) AS all_Sum
+SELECT SUM(amount) AS all_Sum_byMouth_Repeated
 FROM "transactions"
 WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
   AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
@@ -64,7 +64,93 @@ WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
 
 
 
+
+
+
+
+
+SELECT SUM(amount) AS all_Sum
+FROM "transactions";
+
+
+
+
+
+
 -- -------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+SELECT cc.card_name, SUM(t.amount) AS all_Sum_byMonth_Repeated
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+SELECT cc.card_name, SUM(t.amount) AS all_Sum_byMonth_Repeated
+FROM transactions t
+INNER JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+
+
+
+
+SELECT c.name AS category, SUM(t.amount) AS all_Sum_byMonth
+FROM transactions t
+LEFT JOIN categories c ON t.category_id = c.id 
+WHERE EXTRACT(MONTH FROM t.date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY c.name
+ORDER BY all_Sum_byMonth;
+
+
+SELECT c.name as category , SUM(t.amount) AS all_Sum_byMonth
+FROM transactions t
+INNER JOIN categories c ON t.category_id = c.id 
+GROUP BY category
+ORDER BY all_Sum_byMonth;
+
+
+
+
+
+
+
+
+
+
+-- -------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, 
+t.date_record, t.purchase_date, t.date, cc.card_name, t.is_repeated 
+             FROM transactions t 
+             LEFT JOIN categories c ON t.category_id = c.id 
+             LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+             LEFT JOIN companies co ON t.company_id = co.id 
+             LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+             WHERE t.user_id = 1  AND is_repeated='TRUE'
+             ORDER BY t.date DESC, user_id
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
 
 
 

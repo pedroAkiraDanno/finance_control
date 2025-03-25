@@ -1158,6 +1158,15 @@ POSTGRESQL:
 
 
 
+            How to access PgAdmin4 in web browser?
+            Open your desktop pgAdmin4, then do the following steps:
+
+            Open File > Runtime > View Log
+            Scroll untill the bottom then you will find the following Application Server URL: http://127.0.0.1:{PORT_NUMBER}/?key={YOUR_KEY}
+            Copy this and open in your browser: https://stackoverflow.com/questions/73339903/how-to-access-pgadmin4-in-web-browser
+
+            http://127.0.0.1:5050/browser/
+            127.0.0.1:5050/?key=d0ffdd35-5d4e-4fb9-a1c2-15f44fa6092e
 
 
 
