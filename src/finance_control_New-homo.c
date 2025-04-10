@@ -8,10 +8,6 @@
 
 
 
-
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -847,7 +843,7 @@ int main() {
                 
                 PQclear(company_res);
                 
-                printf("Enter date record (YYYY-MM-DD): ");
+                printf("Enter date record (YYYY-MM-DD): ***(If Credit Card, put card expiration date)");
                 scanf(" %[^\n]", date_record);
                 
                 printf("Enter purchase date (YYYY-MM-DD): ");
@@ -1009,6 +1005,17 @@ POSTGRESQL:
             ('Transport'),
             ('Entertainment'),
             ('Others');
+
+            -- Insert initial data for transaction categories
+            INSERT INTO categories (name) VALUES            
+            ('Education and Development'),  -- New category
+            ('Emergencies'),                -- New category
+            ('Hobbies and Leisure Activities'),  -- New category
+            ('Streaming');                  -- New category;
+
+
+
+
 
             -- Insert initial data for income categories
             INSERT INTO categories_income (name) VALUES
