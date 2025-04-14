@@ -740,7 +740,7 @@ int main() {
                 viewPaymentMethods(conn);
                 printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card): ");
                 scanf("%d", &payment_method_id);
-                printf("Enter date record (YYYY-MM-DD): ");
+                printf("Enter date record (YYYY-MM-DD): *(If Card: Expiry date): ");
                 scanf(" %[^\n]", date_record);
                 addIncome(conn, description, amount, category_income_id, payment_method_id, date_record);
                 break;
@@ -847,7 +847,7 @@ int main() {
                 
                 PQclear(company_res);
                 
-                printf("Enter date record (YYYY-MM-DD): ");
+                printf("Enter date record (YYYY-MM-DD): ***(If Card: Expiry date): ");
                 scanf(" %[^\n]", date_record);
                 
                 printf("Enter purchase date (YYYY-MM-DD): ");

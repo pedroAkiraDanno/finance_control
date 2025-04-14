@@ -847,7 +847,7 @@ int main() {
                 
                 PQclear(company_res);
                 
-                printf("Enter date record (YYYY-MM-DD): ");
+                printf("Enter date record (YYYY-MM-DD): *(If Card: Expiry date): ");
                 scanf(" %[^\n]", date_record);
                 
                 printf("Enter purchase date (YYYY-MM-DD): ");

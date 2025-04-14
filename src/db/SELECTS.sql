@@ -130,7 +130,10 @@ ORDER BY all_Sum_byMonth;
 
 
 
+
 -- -------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 
 
@@ -149,6 +152,8 @@ ORDER BY t.date DESC, user_id;
 
 
 
+
+
 -- Retrieving transaction details for a specific user where the company is 'Uber'
 SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, 
 t.date_record, t.purchase_date, t.date, cc.card_name, t.is_repeated 
@@ -161,6 +166,205 @@ WHERE t.user_id = 1  AND co.name = 'Uber'
 ORDER BY t.purchase_date DESC, user_id;
 
 
+
+
+
+
+
+
+
+
+-- Retrieving transaction details for a specific user where the company is 'Uber'
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, 
+t.date_record, t.purchase_date, t.date, cc.card_name, t.is_repeated 
+FROM transactions t 
+LEFT JOIN categories c ON t.category_id = c.id 
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+LEFT JOIN companies co ON t.company_id = co.id 
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+WHERE t.user_id = 1 
+--ORDER BY t.purchase_date DESC, user_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 
+    t.purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1 -- change the user ID as needed
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+
+SELECT 
+    TO_CHAR(t.purchase_date, 'DD-MM-YYYY') AS purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+
+SELECT 
+    TO_CHAR(t.purchase_date, 'DD-MM-YYYY') AS purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND t.purchase_date = CURRENT_DATE
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+
+SELECT 
+    TO_CHAR(t.purchase_date, 'DD-MM-YYYY') AS purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND t.purchase_date = CURRENT_DATE - INTERVAL '1 day'
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+
+
+--To show how much you spent on weekends (Saturday and Sunday)
+SELECT 
+    TO_CHAR(t.purchase_date, 'DD-MM-YYYY') AS purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND EXTRACT(DOW FROM t.purchase_date) IN (0, 6)
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+--To show how much you spent on weekends (Saturday , Sunday and friday)
+SELECT 
+    TO_CHAR(t.purchase_date, 'DD-MM-YYYY') AS purchase_date,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND EXTRACT(DOW FROM t.purchase_date) IN (5, 6, 0) -- Friday, Saturday, Sunday
+GROUP BY 
+    t.purchase_date
+ORDER BY 
+    t.purchase_date;
+
+
+
+
+
+
+
+
+
+
+
+SELECT 
+    'This Weekend (Friday to Sunday)' AS weekend_label,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND t.purchase_date >= CURRENT_DATE - ((EXTRACT(DOW FROM CURRENT_DATE)::INT + 2) % 7)  -- Last Friday
+    AND t.purchase_date <= CURRENT_DATE + ((7 - EXTRACT(DOW FROM CURRENT_DATE)::INT) % 7)  -- This Sunday
+
+
+
+
+
+
+
+SELECT 
+    'This Weekend (Saturday and Sunday)' AS weekend_label,
+    SUM(t.amount) AS total_expenses
+FROM 
+    transactions t
+WHERE 
+    t.type = 'expense'
+    AND t.user_id = 1
+    AND t.purchase_date >= CURRENT_DATE - ((EXTRACT(DOW FROM CURRENT_DATE)::INT + 1) % 7)  -- Saturday
+    AND t.purchase_date <= CURRENT_DATE + ((7 - EXTRACT(DOW FROM CURRENT_DATE)::INT) % 7)  -- Sunday
+
+
+
+
+
+UPDATE transactions
+SET purchase_date = '2025-04-12'
+WHERE id = 28;
+
+
+
+
+
+UPDATE transactions
+SET purchase_date = '2024-12-05'
+WHERE id = 7;
 
 
 
