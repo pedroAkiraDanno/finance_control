@@ -12,6 +12,10 @@
 
 
 
+
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +50,9 @@ void addAccount(PGconn *conn, int user_id, const char *title_account, float bala
 void viewAccounts(PGconn *conn, int user_id); // Update this
 void recordLoginActivity(PGconn *conn, int user_id);
 void recordLogoutActivity(PGconn *conn, int user_id);
+void addCategory(PGconn *conn, int is_income_category);
+
+
 
 
 
@@ -82,7 +89,6 @@ void displayIntroduction() {
 
 
 
-
 void printMenu() {
     printf("1. Add Income (e.g., Salary)\n");
     printf("2. Add Expense\n");
@@ -97,8 +103,9 @@ void printMenu() {
     printf("11. Add Account\n");
     printf("12. View Accounts\n");
     printf("13. View Bank Companies\n");
-    printf("14. View User Activity\n");  // New option
-    printf("15. Exit\n");
+    printf("14. View User Activity\n");
+    printf("15. Add Category\n");  // New unified option
+    printf("16. Exit\n");
 }
 
 
@@ -107,6 +114,31 @@ void printMenu() {
 
 
 
+
+// Function to add a new category (transaction or income)
+void addCategory(PGconn *conn, int is_income_category) {
+    char category_name[100];
+    char table_name[20];
+    
+    strcpy(table_name, is_income_category ? "categories_income" : "categories");
+    
+    printf("Enter new %s category name: ", is_income_category ? "income" : "transaction");
+    scanf(" %[^\n]", category_name);
+    
+    char query[256];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO %s (name) VALUES ('%s')", 
+             table_name, category_name);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add category: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Category added successfully!\n");
+}
 
 
 
@@ -740,7 +772,7 @@ int main() {
                 viewPaymentMethods(conn);
                 printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card): ");
                 scanf("%d", &payment_method_id);
-                printf("Enter date record (YYYY-MM-DD): *(If Card: Expiry date): ");
+                printf("Enter date record (YYYY-MM-DD): ");
                 scanf(" %[^\n]", date_record);
                 addIncome(conn, description, amount, category_income_id, payment_method_id, date_record);
                 break;
@@ -909,7 +941,24 @@ int main() {
             case 14: // View User Activity
                 viewUserActivity(conn, user_id);
                 break;
-            case 15: // Exit
+
+            case 15: { // Add Category
+                    int category_type;
+                    printf("Select category type:\n");
+                    printf("1. Transaction Category\n");
+                    printf("2. Income Category\n");
+                    printf("Enter your choice: ");
+                    scanf("%d", &category_type);
+                    
+                    if (category_type == 1 || category_type == 2) {
+                        addCategory(conn, category_type == 2);
+                    } else {
+                        printf("Invalid category type selection.\n");
+                    }
+                    break;
+            }
+
+            case 16: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
