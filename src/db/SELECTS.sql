@@ -187,7 +187,34 @@ WHERE t.user_id = 1
 
 
 
-
+-- Retrieving transaction details for a specific user where the company is 'Uber'
+SELECT 
+    t.id, 
+    t.title, 
+    t.description, 
+    t.amount, 
+    t.type, 
+    c.name AS category,
+    sc.name AS subcategory,  -- Added subcategory name
+    pm.method AS payment_method, 
+    co.name AS company, 
+    t.date_record, 
+    t.purchase_date, 
+    t.date, 
+    cc.card_name, 
+    t.is_repeated,
+    a.title_account AS account_name  -- Added account name
+FROM transactions t 
+LEFT JOIN categories c ON t.category_id = c.id 
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id  -- Added LEFT JOIN for subcategories
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+LEFT JOIN companies co ON t.company_id = co.id 
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+LEFT JOIN account a ON t.account_id = a.id  -- Added LEFT JOIN for account
+WHERE t.user_id = 1 
+-- Optional: Filter for specific company
+-- AND co.name = 'Uber'
+ORDER BY t.purchase_date DESC;
 
 
 
@@ -375,13 +402,18 @@ WHERE id = 7;
 -- Database backup and restore commands
 
 -- Backup the 'finances' database
-pg_dump -U postgres -h localhost -p 5432 -F c -b -v -f "C:\Users\Akira\Documents\finances_18042025.backup" finances;
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_22042025.sql" finances
+
+
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_Homolog < "C:\PostgreSQL\finances_22042025.sql"
+
 
 -- Create a new database for homologation (testing purposes)
-createdb -U postgres -h localhost -p 5432 finances_Homolog;
+"C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres -h localhost -p 5432 finances_Homolog
 
 -- Restore the backup into the 'finances_Homolog' database
-pg_restore -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\Users\Akira\Documents\finances.backup";
+"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
 
 
 
