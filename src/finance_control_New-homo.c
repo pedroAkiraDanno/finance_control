@@ -1234,15 +1234,21 @@ POSTGRESQL:
 
 
 
+
     -- Insert extended list of transaction categories
     INSERT INTO categories (name) VALUES
-    ('Education and Development'), -- ID 15
-    ('Emergencies'),              -- ID 16
-    ('Hobbies and Leisure Activities'), -- ID 17
-    ('Streaming'),                -- ID 18
     ('Grocery'),                  -- ID 19 (Translated "Mercado")
     ('Pet'),                      -- ID 20
     ('Vehicle');                  -- ID 21
+
+
+
+
+
+
+
+
+
 
 
 

@@ -406,7 +406,6 @@ WHERE id = 7;
 "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_22042025.sql" finances
 
 
-"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_Homolog < "C:\PostgreSQL\finances_22042025.sql"
 
 
 -- Create a new database for homologation (testing purposes)
@@ -414,6 +413,8 @@ WHERE id = 7;
 
 -- Restore the backup into the 'finances_Homolog' database
 "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
+
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_Homolog < "C:\PostgreSQL\finances_22042025.sql"
 
 
 
