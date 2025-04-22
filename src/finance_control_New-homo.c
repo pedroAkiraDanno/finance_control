@@ -1203,6 +1203,91 @@ POSTGRESQL:
 
 
 
+
+-- Subcategories for transactions
+CREATE TABLE subcategories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    category_id INT NOT NULL,
+    UNIQUE (name, category_id),
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+
+
+-- Insert extended list of transaction categories
+INSERT INTO categories (name) VALUES
+('Education and Development'), -- ID 15
+('Emergencies'),              -- ID 16
+('Hobbies and Leisure Activities'), -- ID 17
+('Streaming'),                -- ID 18
+('Grocery'),                  -- ID 19 (Translated "Mercado")
+('Pet'),                      -- ID 20
+('Vehicle');                  -- ID 21
+
+
+
+-- Insert subcategories for categories
+
+INSERT INTO subcategories (name, category_id) VALUES
+-- Food (1)
+('Bar', 1),
+('Restaurant', 1),
+('Drinks', 1),
+('Alcoholic Drinks', 1),
+('Snacks', 1),
+('Breakfast', 1),
+('Lunch', 1),
+('Afternoon Coffee', 1),
+('Dinner', 1),
+('Coffee', 1),
+('Delivery', 1),
+('Butcher', 1),
+('Farmers Market', 1),
+('Bakery', 1),
+
+-- Health (10)
+('Gym and Fitness', 10),
+('Well-being (spa, therapy)', 10),
+('Health Insurance', 10),
+('Pharmacy and Medication', 10),
+('Appointments and Treatments', 10),
+('Exams', 10),
+('Dentists', 10),
+
+-- Transport (12)
+('Bus', 12),
+('Airplane', 12),
+('Subway', 12),
+('Train', 12),
+('Taxi and Ride Apps', 12),
+
+-- Education and Development (15)
+('Courses and Training', 15),
+('Books and Materials', 15),
+('School Supplies', 15),
+('School Fees', 15),
+('College Tuition', 15),
+('Uniforms', 15),
+
+-- Pet (20)
+('Food', 20),
+('Bath and Grooming', 20),
+('Medication', 20),
+('Veterinarian', 20),
+('Accessories', 20),
+
+-- Vehicle (21)
+('Rentals', 21),
+('Fuel', 21),
+('Parking', 21),
+('Leasing', 21),
+('Car Maintenance', 21),
+('Car Insurance', 21);
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
@@ -1897,6 +1982,20 @@ POSTGRESQL:
                 activity_type VARCHAR(50) NOT NULL, -- 'login' or 'logout'
                 activity_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Time when the activity occurred
             );
+
+
+
+
+
+
+
+
+            
+
+
+
+
+
 
 
 
