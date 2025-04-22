@@ -375,7 +375,7 @@ WHERE id = 7;
 -- Database backup and restore commands
 
 -- Backup the 'finances' database
-pg_dump -U postgres -h localhost -p 5432 -F c -b -v -f "C:\Users\Akira\Documents\finances.backup" finances;
+pg_dump -U postgres -h localhost -p 5432 -F c -b -v -f "C:\Users\Akira\Documents\finances_18042025.backup" finances;
 
 -- Create a new database for homologation (testing purposes)
 createdb -U postgres -h localhost -p 5432 finances_Homolog;
