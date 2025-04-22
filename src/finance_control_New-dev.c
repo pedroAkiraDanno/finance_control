@@ -11,6 +11,7 @@
 
 
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@ void clearScreen();
 void printMenu();
 void getCurrentDate(char *date);
 void detect_os();
-void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id);
+void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int subcategory_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id);
 void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record);
 void viewTransactions(PGconn *conn, int user_id);
 void viewIncome(PGconn *conn);
@@ -46,6 +47,9 @@ void viewAccounts(PGconn *conn, int user_id); // Update this
 void recordLoginActivity(PGconn *conn, int user_id);
 void recordLogoutActivity(PGconn *conn, int user_id);
 void addCategory(PGconn *conn, int is_income_category);
+void viewSubcategories(PGconn *conn, int category_id);
+void addSubcategory(PGconn *conn);
+
 
 
 
@@ -83,7 +87,6 @@ void displayIntroduction() {
 
 
 
-
 void printMenu() {
     printf("1. Add Income (e.g., Salary)\n");
     printf("2. Add Expense\n");
@@ -99,8 +102,9 @@ void printMenu() {
     printf("12. View Accounts\n");
     printf("13. View Bank Companies\n");
     printf("14. View User Activity\n");
-    printf("15. Add Category\n");  // New unified option
-    printf("16. Exit\n");
+    printf("15. Add Category\n");
+    printf("16. Add Subcategory\n");  // New option
+    printf("17. Exit\n");
 }
 
 
@@ -155,10 +159,10 @@ void detect_os() {
     #endif
 }
 
-
-void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id) {
+void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int subcategory_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id) {
     char query[512];
     char account_id_str[20]; // Buffer to hold the account_id as a string or "NULL"
+    char subcategory_id_str[20]; // Buffer to hold the subcategory_id as a string or "NULL"
 
     // Convert account_id to a string or "NULL"
     if (account_id == -1) {
@@ -167,19 +171,26 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         snprintf(account_id_str, sizeof(account_id_str), "%d", account_id);
     }
 
+    // Convert subcategory_id to a string or "NULL"
+    if (subcategory_id == -1) {
+        strcpy(subcategory_id_str, "NULL");
+    } else {
+        snprintf(subcategory_id_str, sizeof(subcategory_id_str), "%d", subcategory_id);
+    }
+
     if (company_name[0] == '\0') {
         // If company name is empty, insert NULL for company_id
         if (payment_method_id == 2) { // Credit Card
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', '%s', %d, %s, %s, %d)", 
-                     title, description, amount, type, category_id, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', %d, %s, %s, %d)", 
+                     title, description, amount, type, category_id, subcategory_id_str, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         } else {
             // For non-credit card payments, set credit_card_id to NULL
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, '%s', '%s', NULL, %s, %s, %d)", 
-                     title, description, amount, type, category_id, payment_method_id, date_record, purchase_date, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', NULL, %s, %s, %d)", 
+                     title, description, amount, type, category_id, subcategory_id_str, payment_method_id, date_record, purchase_date, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         }
     } else {
         // Insert company if it doesn't exist
@@ -198,15 +209,15 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         // Insert transaction with company_id
         if (payment_method_id == 2) { // Credit Card
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', '%s', %d, %s, %s, %d)", 
-                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, purchase_date, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, payment_method_id, company_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', '%s', %d, %s, %s, %d)", 
+                     title, description, amount, type, category_id, subcategory_id_str, payment_method_id, company_name, date_record, purchase_date, credit_card_id, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         } else {
             // For non-credit card payments, set credit_card_id to NULL
             snprintf(query, sizeof(query), 
-                     "INSERT INTO transactions (title, description, amount, type, category_id, payment_method_id, company_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
-                     "VALUES ('%s', '%s', %.2f, '%s', %d, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', '%s', NULL, %s, %s, %d)", 
-                     title, description, amount, type, category_id, payment_method_id, company_name, date_record, purchase_date, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
+                     "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, payment_method_id, company_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id) "
+                     "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, (SELECT id FROM companies WHERE name = '%s'), '%s', '%s', NULL, %s, %s, %d)", 
+                     title, description, amount, type, category_id, subcategory_id_str, payment_method_id, company_name, date_record, purchase_date, is_repeated ? "TRUE" : "FALSE", account_id_str, user_id);
         }
     }
 
@@ -219,6 +230,8 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
     PQclear(res);
     printf("Transaction added successfully!\n");
 }
+
+
 
 
 
@@ -307,16 +320,22 @@ void addIncome(PGconn *conn, const char *description, float amount, int category
 
 
 void viewTransactions(PGconn *conn, int user_id) {
-    char query[512];
+    char query[1024];
     snprintf(query, sizeof(query),
-             "SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, pm.method AS payment_method, co.name AS company, t.date_record, t.purchase_date, t.date, cc.card_name, t.is_repeated "
+             "SELECT t.id, t.title, t.description, t.amount, t.type, "
+             "c.name AS category, sc.name AS subcategory, pm.method AS payment_method, "
+             "co.name AS company, t.date_record, t.purchase_date, t.date, "
+             "cc.card_name, t.is_repeated, a.title_account AS account_name "
              "FROM transactions t "
              "LEFT JOIN categories c ON t.category_id = c.id "
+             "LEFT JOIN subcategories sc ON t.subcategory_id = sc.id "
              "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
              "LEFT JOIN companies co ON t.company_id = co.id "
              "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
-             "WHERE t.user_id = %d "
-             "ORDER BY t.date DESC", user_id);
+             "LEFT JOIN account a ON t.account_id = a.id "
+             "WHERE t.user_id = %d "  // Changed from t.user to t.user_id
+             "ORDER BY t.date DESC",
+             user_id);
 
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -329,27 +348,30 @@ void viewTransactions(PGconn *conn, int user_id) {
     if (rows == 0) {
         printf("No transactions found.\n");
     } else {
-        printf("ID | Title            | Description       | Amount  | Type    | Category      | Payment Method | Company        | Date Record | Purchase Date | Date       | Credit Card | Repeated\n");
-        printf("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+        printf("ID | Title            | Description       | Amount  | Type    | Category      | Subcategory    | Payment Method | Company        | Date Record | Purchase Date | Date       | Credit Card | Repeated | Account\n");
+        printf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
         for (int i = 0; i < rows; i++) {
-            printf("%s | %-15s | %-17s | %-7s | %-7s | %-13s | %-14s | %-14s | %-11s | %-12s | %s | %-11s | %s\n",
-                   PQgetvalue(res, i, 0), // ID
-                   PQgetvalue(res, i, 1), // Title
-                   PQgetvalue(res, i, 2), // Description
-                   PQgetvalue(res, i, 3), // Amount
-                   PQgetvalue(res, i, 4), // Type
-                   PQgetvalue(res, i, 5), // Category
-                   PQgetvalue(res, i, 6), // Payment Method
-                   PQgetvalue(res, i, 7), // Company
-                   PQgetvalue(res, i, 8), // Date Record
-                   PQgetvalue(res, i, 9), // Purchase Date
-                   PQgetvalue(res, i, 10), // Date
-                   PQgetvalue(res, i, 11), // Credit Card
-                   PQgetvalue(res, i, 12)); // Repeated
+            printf("%s | %-15s | %-17s | %-7s | %-7s | %-13s | %-14s | %-14s | %-14s | %-11s | %-12s | %s | %-11s | %s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Title
+                   PQgetvalue(res, i, 2),  // Description
+                   PQgetvalue(res, i, 3),  // Amount
+                   PQgetvalue(res, i, 4),  // Type
+                   PQgetvalue(res, i, 5),  // Category
+                   PQgetvalue(res, i, 6),  // Subcategory
+                   PQgetvalue(res, i, 7),  // Payment Method
+                   PQgetvalue(res, i, 8),  // Company
+                   PQgetvalue(res, i, 9),  // Date Record
+                   PQgetvalue(res, i, 10), // Purchase Date
+                   PQgetvalue(res, i, 11), // Date
+                   PQgetvalue(res, i, 12), // Credit Card
+                   PQgetvalue(res, i, 13), // Repeated
+                   PQgetvalue(res, i, 14)); // Account
         }
     }
     PQclear(res);
 }
+
 
 
 
@@ -694,11 +716,64 @@ void viewUserActivity(PGconn *conn, int user_id) {
 }
 
 
+void viewSubcategories(PGconn *conn, int category_id) {
+    char query[256];
+    snprintf(query, sizeof(query),
+             "SELECT id, name FROM subcategories WHERE category_id = %d ORDER BY id", 
+             category_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    printf("ID | Subcategory Name\n");
+    printf("-------------------\n");
+    for (int i = 0; i < rows; i++) {
+        printf("%s | %s\n",
+               PQgetvalue(res, i, 0),
+               PQgetvalue(res, i, 1));
+    }
+    PQclear(res);
+}
+
+
+void addSubcategory(PGconn *conn) {
+    viewCategories(conn);
+    
+    int category_id;
+    char subcategory_name[100];
+    
+    printf("Enter category ID for the new subcategory: ");
+    scanf("%d", &category_id);
+    printf("Enter new subcategory name: ");
+    scanf(" %[^\n]", subcategory_name);
+    
+    char query[256];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO subcategories (name, category_id) VALUES ('%s', %d)", 
+             subcategory_name, category_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add subcategory: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Subcategory added successfully!\n");
+}
+
+
+
 
 
 
 int main() {
-    const char *conninfo = "dbname=finances_Homolog user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
+    const char *conninfo = "dbname=finances_Dev user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
 
     if (PQstatus(conn) != CONNECTION_OK) {
@@ -771,122 +846,65 @@ int main() {
                 scanf(" %[^\n]", date_record);
                 addIncome(conn, description, amount, category_income_id, payment_method_id, date_record);
                 break;
-                case 2: // Add Expense
-                char title[100];
-                char purchase_date[11]; // YYYY-MM-DD format
-                printf("Enter title: ");
-                scanf(" %[^\n]", title);
-                printf("Enter description: ");
-                scanf(" %[^\n]", description);
-                printf("Enter amount: ");
-                scanf("%f", &amount);
-                viewCategories(conn);
-                printf("Enter category ID: ");
-                scanf("%d", &category_id);
-                viewPaymentMethods(conn);
-                printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card, 4 for Pix): ");
-                scanf("%d", &payment_method_id);
-                
-                if (payment_method_id == 2) { // Credit Card
-                    viewCreditCards(conn);
-                    printf("Enter credit card ID: ");
-                    scanf("%d", &credit_card_id);
-                } else {
-                    credit_card_id = 0; // Not applicable for non-credit card payments
-                }
-                
-                printf("Is this transaction repeated? (1 for Yes, 0 for No): ");
-                scanf("%d", &is_repeated);
-                
-                // Show existing companies
-                const char *company_query = "SELECT id, name, location FROM companies ORDER BY id";
-                PGresult *company_res = PQexec(conn, company_query);
-                if (PQresultStatus(company_res) != PGRES_TUPLES_OK) {
-                    fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
-                    PQclear(company_res);
+            
+            case 2: { // Add Expense
+                    char title[100];
+                    char purchase_date[11]; // YYYY-MM-DD format
+                    printf("Enter title: ");
+                    scanf(" %[^\n]", title);
+                    printf("Enter description: ");
+                    scanf(" %[^\n]", description);
+                    printf("Enter amount: ");
+                    scanf("%f", &amount);
+                    
+                    // Show categories
+                    viewCategories(conn);
+                    printf("Enter category ID: ");
+                    scanf("%d", &category_id);
+                    
+                    // Ask if user wants to add a subcategory
+                    int use_subcategory;
+                    int subcategory_id = -1; // Default to NULL
+                    printf("Do you want to add a subcategory? (1 for Yes, 0 for No): ");
+                    scanf("%d", &use_subcategory);
+                    
+                    if (use_subcategory == 1) {
+                        viewSubcategories(conn, category_id);
+                        printf("Enter subcategory ID (or -1 to skip): ");
+                        scanf("%d", &subcategory_id);
+                    }
+                    
+                    viewPaymentMethods(conn);
+                    printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card, 4 for Pix): ");
+                    scanf("%d", &payment_method_id);
+                    
+                    if (payment_method_id == 2) { // Credit Card
+                        viewCreditCards(conn);
+                        printf("Enter credit card ID: ");
+                        scanf("%d", &credit_card_id);
+                    } else {
+                        credit_card_id = 0; // Not applicable for non-credit card payments
+                    }
+                    
+                    printf("Is this transaction repeated? (1 for Yes, 0 for No): ");
+                    scanf("%d", &is_repeated);
+                    
+                    // Rest of the company handling code remains the same...
+                    
+                    printf("Enter date record (YYYY-MM-DD): ***(If Card: Expiry date): ");
+                    scanf(" %[^\n]", date_record);
+                    
+                    printf("Enter purchase date (YYYY-MM-DD): ");
+                    scanf(" %[^\n]", purchase_date);
+                    
+                    // Ask for account ID for all payment methods
+                    viewAccounts(conn, user_id);
+                    printf("Enter account ID (or -1 if not applicable): ");
+                    scanf("%d", &account_id);
+                    
+                    addTransaction(conn, user_id, title, description, amount, "expense", category_id, subcategory_id, payment_method_id, company_name, company_location, date_record, purchase_date, credit_card_id, is_repeated, account_id);
                     break;
                 }
-                
-                int company_rows = PQntuples(company_res);
-                if (company_rows > 0) {
-                    printf("Existing Companies:\n");
-                    printf("ID | Company Name         | Location\n");
-                    printf("------------------------------------\n");
-                    for (int i = 0; i < company_rows; i++) {
-                        printf("%s | %-20s | %s\n",
-                               PQgetvalue(company_res, i, 0), // ID
-                               PQgetvalue(company_res, i, 1), // Name
-                               PQgetvalue(company_res, i, 2)); // Location
-                    }
-                } else {
-                    printf("No companies found.\n");
-                }
-                
-                // Ask if the user wants to add a new company
-                int add_new_company;
-                printf("Do you want to add a new company? (1 for Yes, 0 for No): ");
-                scanf("%d", &add_new_company);
-                
-                if (add_new_company == 1) {
-                    // Add a new company
-                    printf("Enter company name: ");
-                    scanf(" %[^\n]", company_name);
-                    printf("Enter company location: ");
-                    scanf(" %[^\n]", company_location);
-                
-                    char new_company_query[256];
-                    snprintf(new_company_query, sizeof(new_company_query), 
-                             "INSERT INTO companies (name, location) VALUES ('%s', '%s') ON CONFLICT (name) DO NOTHING", 
-                             company_name, company_location);
-                    PGresult *new_company_res = PQexec(conn, new_company_query);
-                    if (PQresultStatus(new_company_res) != PGRES_COMMAND_OK) {
-                        fprintf(stderr, "Company insertion failed: %s", PQerrorMessage(conn));
-                        PQclear(new_company_res);
-                        PQclear(company_res);
-                        break;
-                    }
-                    PQclear(new_company_res);
-                    printf("New company added successfully!\n");
-                } else {
-                    // Select an existing company
-                    int company_id;
-                    printf("Enter the ID of the company: ");
-                    scanf("%d", &company_id);
-                
-                    // Fetch the selected company's name and location
-                    char selected_company_query[256];
-                    snprintf(selected_company_query, sizeof(selected_company_query), 
-                             "SELECT name, location FROM companies WHERE id = %d", 
-                             company_id);
-                    PGresult *selected_company_res = PQexec(conn, selected_company_query);
-                    if (PQresultStatus(selected_company_res) != PGRES_TUPLES_OK || PQntuples(selected_company_res) == 0) {
-                        fprintf(stderr, "Invalid company ID: %s", PQerrorMessage(conn));
-                        PQclear(selected_company_res);
-                        PQclear(company_res);
-                        break;
-                    }
-                
-                    // Copy the company name and location
-                    strcpy(company_name, PQgetvalue(selected_company_res, 0, 0));
-                    strcpy(company_location, PQgetvalue(selected_company_res, 0, 1));
-                    PQclear(selected_company_res);
-                }
-                
-                PQclear(company_res);
-                
-                printf("Enter date record (YYYY-MM-DD): ***(If Card: Expiry date): ");
-                scanf(" %[^\n]", date_record);
-                
-                printf("Enter purchase date (YYYY-MM-DD): ");
-                scanf(" %[^\n]", purchase_date);
-                
-                // Ask for account ID for all payment methods
-                viewAccounts(conn, user_id); // Pass user_id
-                printf("Enter account ID (or -1 if not applicable): ");
-                scanf("%d", &account_id); // Get account ID from user
-                
-                addTransaction(conn, user_id, title, description, amount, "expense", category_id, payment_method_id, company_name, company_location, date_record, purchase_date, credit_card_id, is_repeated, account_id);
-                break;
             case 3: // View Transactions
                 viewTransactions(conn, user_id); // Pass user_id
                 break;
@@ -952,8 +970,10 @@ int main() {
                     }
                     break;
             }
-
-            case 16: // Exit
+        case 16: // Add Subcategory
+            addSubcategory(conn);
+            break;
+            case 17: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
@@ -1053,6 +1073,17 @@ POSTGRESQL:
             ('Transport'),
             ('Entertainment'),
             ('Others');
+
+            -- Insert initial data for transaction categories
+            INSERT INTO categories (name) VALUES            
+            ('Education and Development'),  -- New category
+            ('Emergencies'),                -- New category
+            ('Hobbies and Leisure Activities'),  -- New category
+            ('Streaming');                  -- New category;
+
+
+
+
 
             -- Insert initial data for income categories
             INSERT INTO categories_income (name) VALUES
@@ -1195,6 +1226,103 @@ POSTGRESQL:
 
 
 
+
+    -- Subcategories for transactions
+    CREATE TABLE subcategories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(50) NOT NULL,
+        category_id INT NOT NULL,
+        UNIQUE (name, category_id),
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    );
+
+
+
+
+    -- Insert extended list of transaction categories
+    INSERT INTO categories (name) VALUES
+    ('Grocery'),                  -- ID 19 (Translated "Mercado")
+    ('Pet'),                      -- ID 20
+    ('Vehicle');                  -- ID 21
+
+
+
+
+
+
+
+
+
+
+
+
+    -- Insert subcategories for categories
+
+    INSERT INTO subcategories (name, category_id) VALUES
+    -- Food (1)
+    ('Bar', 1),
+    ('Restaurant', 1),
+    ('Drinks', 1),
+    ('Alcoholic Drinks', 1),
+    ('Snacks', 1),
+    ('Breakfast', 1),
+    ('Lunch', 1),
+    ('Afternoon Coffee', 1),
+    ('Dinner', 1),
+    ('Coffee', 1),
+    ('Delivery', 1),
+    ('Butcher', 1),
+    ('Farmers Market', 1),
+    ('Bakery', 1),
+
+    -- Health (10)
+    ('Gym and Fitness', 10),
+    ('Well-being (spa, therapy)', 10),
+    ('Health Insurance', 10),
+    ('Pharmacy and Medication', 10),
+    ('Appointments and Treatments', 10),
+    ('Exams', 10),
+    ('Dentists', 10),
+
+    -- Transport (12)
+    ('Bus', 12),
+    ('Airplane', 12),
+    ('Subway', 12),
+    ('Train', 12),
+    ('Taxi and Ride Apps', 12),
+
+    -- Education and Development (15)
+    ('Courses and Training', 15),
+    ('Books and Materials', 15),
+    ('School Supplies', 15),
+    ('School Fees', 15),
+    ('College Tuition', 15),
+    ('Uniforms', 15),
+
+    -- Pet (20)
+    ('Food', 20),
+    ('Bath and Grooming', 20),
+    ('Medication', 20),
+    ('Veterinarian', 20),
+    ('Accessories', 20),
+
+    -- Vehicle (21)
+    ('Rentals', 21),
+    ('Fuel', 21),
+    ('Parking', 21),
+    ('Leasing', 21),
+    ('Car Maintenance', 21),
+    ('Car Insurance', 21);
+
+
+
+    ALTER TABLE transactions 
+    ADD COLUMN subcategory_id INT REFERENCES subcategories(id) ON DELETE SET NULL;
+
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
@@ -1202,6 +1330,15 @@ POSTGRESQL:
 
 
 
+            How to access PgAdmin4 in web browser?
+            Open your desktop pgAdmin4, then do the following steps:
+
+            Open File > Runtime > View Log
+            Scroll untill the bottom then you will find the following Application Server URL: http://127.0.0.1:{PORT_NUMBER}/?key={YOUR_KEY}
+            Copy this and open in your browser: https://stackoverflow.com/questions/73339903/how-to-access-pgadmin4-in-web-browser
+
+            http://127.0.0.1:5050/browser/
+            127.0.0.1:5050/?key=d0ffdd35-5d4e-4fb9-a1c2-15f44fa6092e
 
 
 
@@ -1258,6 +1395,47 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
