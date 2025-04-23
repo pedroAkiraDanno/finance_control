@@ -14,6 +14,9 @@
 
 
 
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -848,8 +851,7 @@ int main() {
                 scanf(" %[^\n]", date_record);
                 addIncome(conn, description, amount, category_income_id, payment_method_id, date_record);
                 break;
-            
-            case 2: { // Add Expense
+                case 2: { // Add Expense
                     char title[100];
                     char purchase_date[11]; // YYYY-MM-DD format
                     printf("Enter title: ");
@@ -891,7 +893,82 @@ int main() {
                     printf("Is this transaction repeated? (1 for Yes, 0 for No): ");
                     scanf("%d", &is_repeated);
                     
-                    // Rest of the company handling code remains the same...
+                    // Company handling section
+                    // Show existing companies
+                    const char *company_query = "SELECT id, name, location FROM companies ORDER BY id";
+                    PGresult *company_res = PQexec(conn, company_query);
+                    if (PQresultStatus(company_res) != PGRES_TUPLES_OK) {
+                        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+                        PQclear(company_res);
+                        break;
+                    }
+                    
+                    int company_rows = PQntuples(company_res);
+                    if (company_rows > 0) {
+                        printf("Existing Companies:\n");
+                        printf("ID | Company Name         | Location\n");
+                        printf("------------------------------------\n");
+                        for (int i = 0; i < company_rows; i++) {
+                            printf("%s | %-20s | %s\n",
+                                   PQgetvalue(company_res, i, 0), // ID
+                                   PQgetvalue(company_res, i, 1), // Name
+                                   PQgetvalue(company_res, i, 2)); // Location
+                        }
+                    } else {
+                        printf("No companies found.\n");
+                    }
+                    
+                    // Ask if the user wants to add a new company
+                    int add_new_company;
+                    printf("Do you want to add a new company? (1 for Yes, 0 for No): ");
+                    scanf("%d", &add_new_company);
+                    
+                    if (add_new_company == 1) {
+                        // Add a new company
+                        printf("Enter company name: ");
+                        scanf(" %[^\n]", company_name);
+                        printf("Enter company location: ");
+                        scanf(" %[^\n]", company_location);
+                    
+                        char new_company_query[256];
+                        snprintf(new_company_query, sizeof(new_company_query), 
+                                 "INSERT INTO companies (name, location) VALUES ('%s', '%s') ON CONFLICT (name) DO NOTHING", 
+                                 company_name, company_location);
+                        PGresult *new_company_res = PQexec(conn, new_company_query);
+                        if (PQresultStatus(new_company_res) != PGRES_COMMAND_OK) {
+                            fprintf(stderr, "Company insertion failed: %s", PQerrorMessage(conn));
+                            PQclear(new_company_res);
+                            PQclear(company_res);
+                            break;
+                        }
+                        PQclear(new_company_res);
+                        printf("New company added successfully!\n");
+                    } else {
+                        // Select an existing company
+                        int company_id;
+                        printf("Enter the ID of the company: ");
+                        scanf("%d", &company_id);
+                    
+                        // Fetch the selected company's name and location
+                        char selected_company_query[256];
+                        snprintf(selected_company_query, sizeof(selected_company_query), 
+                                 "SELECT name, location FROM companies WHERE id = %d", 
+                                 company_id);
+                        PGresult *selected_company_res = PQexec(conn, selected_company_query);
+                        if (PQresultStatus(selected_company_res) != PGRES_TUPLES_OK || PQntuples(selected_company_res) == 0) {
+                            fprintf(stderr, "Invalid company ID: %s", PQerrorMessage(conn));
+                            PQclear(selected_company_res);
+                            PQclear(company_res);
+                            break;
+                        }
+                    
+                        // Copy the company name and location
+                        strcpy(company_name, PQgetvalue(selected_company_res, 0, 0));
+                        strcpy(company_location, PQgetvalue(selected_company_res, 0, 1));
+                        PQclear(selected_company_res);
+                    }
+                    
+                    PQclear(company_res);
                     
                     printf("Enter date record (YYYY-MM-DD): ***(If Card: Expiry date): ");
                     scanf(" %[^\n]", date_record);
@@ -906,7 +983,8 @@ int main() {
                     
                     addTransaction(conn, user_id, title, description, amount, "expense", category_id, subcategory_id, payment_method_id, company_name, company_location, date_record, purchase_date, credit_card_id, is_repeated, account_id);
                     break;
-                }
+                }            
+  
             case 3: // View Transactions
                 viewTransactions(conn, user_id); // Pass user_id
                 break;
@@ -1229,28 +1307,23 @@ POSTGRESQL:
 
 
 
-    -- Subcategories for transactions
-    CREATE TABLE subcategories (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(50) NOT NULL,
-        category_id INT NOT NULL,
-        UNIQUE (name, category_id),
-        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-    );
+        -- Subcategories for transactions
+        CREATE TABLE subcategories (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(50) NOT NULL,
+            category_id INT NOT NULL,
+            UNIQUE (name, category_id),
+            FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+        );
 
 
 
 
-    -- Insert extended list of transaction categories
-    INSERT INTO categories (name) VALUES
-    ('Grocery'),                  -- ID 19 (Translated "Mercado")
-    ('Pet'),                      -- ID 20
-    ('Vehicle');                  -- ID 21
-
-
-
-
-
+        -- Insert extended list of transaction categories
+        INSERT INTO categories (name) VALUES
+        ('Grocery'),                  -- ID 19 (Translated "Mercado")
+        ('Pet'),                      -- ID 20
+        ('Vehicle');                  -- ID 21
 
 
 
@@ -1258,68 +1331,73 @@ POSTGRESQL:
 
 
 
-    -- Insert subcategories for categories
-
-    INSERT INTO subcategories (name, category_id) VALUES
-    -- Food (1)
-    ('Bar', 1),
-    ('Restaurant', 1),
-    ('Drinks', 1),
-    ('Alcoholic Drinks', 1),
-    ('Snacks', 1),
-    ('Breakfast', 1),
-    ('Lunch', 1),
-    ('Afternoon Coffee', 1),
-    ('Dinner', 1),
-    ('Coffee', 1),
-    ('Delivery', 1),
-    ('Butcher', 1),
-    ('Farmers Market', 1),
-    ('Bakery', 1),
-
-    -- Health (10)
-    ('Gym and Fitness', 10),
-    ('Well-being (spa, therapy)', 10),
-    ('Health Insurance', 10),
-    ('Pharmacy and Medication', 10),
-    ('Appointments and Treatments', 10),
-    ('Exams', 10),
-    ('Dentists', 10),
-
-    -- Transport (12)
-    ('Bus', 12),
-    ('Airplane', 12),
-    ('Subway', 12),
-    ('Train', 12),
-    ('Taxi and Ride Apps', 12),
-
-    -- Education and Development (15)
-    ('Courses and Training', 15),
-    ('Books and Materials', 15),
-    ('School Supplies', 15),
-    ('School Fees', 15),
-    ('College Tuition', 15),
-    ('Uniforms', 15),
-
-    -- Pet (20)
-    ('Food', 20),
-    ('Bath and Grooming', 20),
-    ('Medication', 20),
-    ('Veterinarian', 20),
-    ('Accessories', 20),
-
-    -- Vehicle (21)
-    ('Rentals', 21),
-    ('Fuel', 21),
-    ('Parking', 21),
-    ('Leasing', 21),
-    ('Car Maintenance', 21),
-    ('Car Insurance', 21);
 
 
 
-    ALTER TABLE transactions 
-    ADD COLUMN subcategory_id INT REFERENCES subcategories(id) ON DELETE SET NULL;
+
+
+        -- Insert subcategories for categories
+
+        INSERT INTO subcategories (name, category_id) VALUES
+        -- Food (1)
+        ('Bar', 1),
+        ('Restaurant', 1),
+        ('Drinks', 1),
+        ('Alcoholic Drinks', 1),
+        ('Snacks', 1),
+        ('Breakfast', 1),
+        ('Lunch', 1),
+        ('Afternoon Coffee', 1),
+        ('Dinner', 1),
+        ('Coffee', 1),
+        ('Delivery', 1),
+        ('Butcher', 1),
+        ('Farmers Market', 1),
+        ('Bakery', 1),
+
+        -- Health (10)
+        ('Gym and Fitness', 10),
+        ('Well-being (spa, therapy)', 10),
+        ('Health Insurance', 10),
+        ('Pharmacy and Medication', 10),
+        ('Appointments and Treatments', 10),
+        ('Exams', 10),
+        ('Dentists', 10),
+
+        -- Transport (12)
+        ('Bus', 12),
+        ('Airplane', 12),
+        ('Subway', 12),
+        ('Train', 12),
+        ('Taxi and Ride Apps', 12),
+
+        -- Education and Development (15)
+        ('Courses and Training', 15),
+        ('Books and Materials', 15),
+        ('School Supplies', 15),
+        ('School Fees', 15),
+        ('College Tuition', 15),
+        ('Uniforms', 15),
+
+        -- Pet (20)
+        ('Food', 20),
+        ('Bath and Grooming', 20),
+        ('Medication', 20),
+        ('Veterinarian', 20),
+        ('Accessories', 20),
+
+        -- Vehicle (21)
+        ('Rentals', 21),
+        ('Fuel', 21),
+        ('Parking', 21),
+        ('Leasing', 21),
+        ('Car Maintenance', 21),
+        ('Car Insurance', 21);
+
+
+
+        ALTER TABLE transactions 
+        ADD COLUMN subcategory_id INT REFERENCES subcategories(id) ON DELETE SET NULL;
 
 
 
@@ -1397,6 +1475,10 @@ LINUX preparation:
 
 
 */
+
+
+
+
 
 
 
