@@ -187,34 +187,25 @@ WHERE t.user_id = 1
 
 
 
+
+
+
+-- with subcategory
 -- Retrieving transaction details for a specific user where the company is 'Uber'
-SELECT 
-    t.id, 
-    t.title, 
-    t.description, 
-    t.amount, 
-    t.type, 
-    c.name AS category,
-    sc.name AS subcategory,  -- Added subcategory name
-    pm.method AS payment_method, 
-    co.name AS company, 
-    t.date_record, 
-    t.purchase_date, 
-    t.date, 
-    cc.card_name, 
-    t.is_repeated,
-    a.title_account AS account_name  -- Added account name
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, sc.name AS subcategory, 
+       pm.method AS payment_method, co.name AS company, t.date_record, t.purchase_date, t.date, 
+       cc.card_name, t.is_repeated, a.title_account AS account_name
 FROM transactions t 
 LEFT JOIN categories c ON t.category_id = c.id 
-LEFT JOIN subcategories sc ON t.subcategory_id = sc.id  -- Added LEFT JOIN for subcategories
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id 
 LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
 LEFT JOIN companies co ON t.company_id = co.id 
 LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
-LEFT JOIN account a ON t.account_id = a.id  -- Added LEFT JOIN for account
+LEFT JOIN account a ON t.account_id = a.id 
 WHERE t.user_id = 1 
 -- Optional: Filter for specific company
 -- AND co.name = 'Uber'
-ORDER BY t.purchase_date DESC;
+--ORDER BY t.purchase_date DESC;
 
 
 
@@ -392,6 +383,18 @@ WHERE id = 28;
 UPDATE transactions
 SET purchase_date = '2024-12-05'
 WHERE id = 7;
+
+
+
+
+
+
+
+-- my travel
+-- Summing the total amount from the "transactions" table for the date range 17-04-2025 to 22-04-2025
+SELECT SUM(amount) AS all_sum
+FROM transactions
+WHERE purchase_date BETWEEN '2025-04-17' AND '2025-04-22';
 
 
 
