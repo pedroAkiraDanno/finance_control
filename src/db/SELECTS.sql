@@ -56,14 +56,6 @@ WHERE EXTRACT(MONTH FROM date_record) = 4
 
 
 
--- Summing the total amount from the "transactions" table for the current month and year
-SELECT SUM(amount) AS all_Sum
-FROM "transactions"
-WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
-  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
-
-
-
 
 -- Summing the total amount from the "transactions" table for the current month and year where 'is_repeated' is 'TRUE'
 SELECT SUM(amount) AS all_Sum_byMouth_Repeated
@@ -79,6 +71,18 @@ WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
 SELECT SUM(amount) AS all_Sum
 FROM "transactions";
 
+
+
+
+
+
+
+
+-- Summing the total amount from the "transactions" table for the current month and year
+SELECT SUM(amount) AS all_Sum
+FROM "transactions"
+WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
 
 
 
@@ -394,7 +398,118 @@ WHERE id = 7;
 -- Summing the total amount from the "transactions" table for the date range 17-04-2025 to 22-04-2025
 SELECT SUM(amount) AS all_sum
 FROM transactions
-WHERE purchase_date BETWEEN '2025-04-17' AND '2025-04-22';
+WHERE purchase_date BETWEEN '2025-04-17' AND '2025-04-23';
+
+
+
+
+-- with subcategory
+-- Retrieving transaction details for a specific user where the company is 'Uber'
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, sc.name AS subcategory, 
+       pm.method AS payment_method, co.name AS company, t.date_record, t.purchase_date, t.date, 
+       cc.card_name, t.is_repeated, a.title_account AS account_name
+FROM transactions t 
+LEFT JOIN categories c ON t.category_id = c.id 
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id 
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+LEFT JOIN companies co ON t.company_id = co.id 
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+LEFT JOIN account a ON t.account_id = a.id 
+WHERE t.user_id = 1 AND purchase_date BETWEEN '2025-04-17' AND '2025-04-23';
+-- Optional: Filter for specific company
+-- AND co.name = 'Uber'
+--ORDER BY t.purchase_date DESC;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- with subcategory
+-- Retrieving transaction details for a specific user where the company is 'Uber'
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, sc.name AS subcategory, 
+       pm.method AS payment_method, co.name AS company, t.date_record, t.purchase_date, t.date, 
+       cc.card_name, t.is_repeated, a.title_account AS account_name
+FROM transactions t 
+LEFT JOIN categories c ON t.category_id = c.id 
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id 
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+LEFT JOIN companies co ON t.company_id = co.id 
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+LEFT JOIN account a ON t.account_id = a.id 
+WHERE t.user_id = 1 AND EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
+-- Optional: Filter for specific company
+-- AND co.name = 'Uber'
+--ORDER BY t.purchase_date DESC;
+
+
+
+
+
+
+
+
+
+
+-- Summing the total amount from the "transactions" table for the current month and year
+SELECT SUM(amount) AS all_Sum
+FROM "transactions"
+WHERE EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
+
+
+
+
+
+
+
+
+
+
+
+-- Retrieving transaction details for a specific user where the card is 'c6'
+SELECT t.id, t.title, t.description, t.amount, t.type, c.name AS category, sc.name AS subcategory, 
+       pm.method AS payment_method, co.name AS company, t.date_record, t.purchase_date, t.date, 
+       cc.card_name, t.is_repeated, a.title_account AS account_name
+FROM transactions t 
+LEFT JOIN categories c ON t.category_id = c.id 
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id 
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id 
+LEFT JOIN companies co ON t.company_id = co.id 
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id 
+LEFT JOIN account a ON t.account_id = a.id 
+WHERE t.user_id = 1 
+  AND EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
+  AND cc.card_name = 'c6'
+-- Optional: Filter for specific company
+-- AND co.name = 'Uber'
+--ORDER BY t.purchase_date DESC;
+
+
+
+
+
+
+
+
+
+
 
 
 
