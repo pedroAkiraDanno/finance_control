@@ -1,18 +1,28 @@
+
+
 @echo off
-:: Get current date in format DDMMYY using WMIC
-for /f %%a in ('"wmic os get localdatetime | findstr /r /v \"^$\""') do set dt=%%a
+setlocal EnableDelayedExpansion
 
-:: Extract parts of the date
-set today=%dt:~6,2%%dt:~4,2%%dt:~2,2%
+rem Get date in YYYYMMDD format
+for /f %%a in ('wmic os get LocalDateTime ^| find "."') do set datetime=%%a
+set year=!datetime:~0,4!
+set month=!datetime:~4,2!
+set day=!datetime:~6,2!
 
-:: Set backup file name with the correct date
-set "backupFile=C:\PostgreSQL\finances_%today%.sql"
+set datestr=!month!_!day!_!year!
+echo datestr is !datestr!
 
-:: Set PostgreSQL password
-set PGPASSWORD=p0w2i8
+rem Define path and backup file name
+set BACKUP_PATH=C:\PostgreSQL\
+set BACKUP_FILE=!BACKUP_PATH!\finances_!datestr!.sql
+echo backup file name is !BACKUP_FILE!
 
-:: Run the pg_dump command
-"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "%backupFile%" finances
+rem Optional: Create the folder if it doesn't exist
+if not exist "!BACKUP_PATH!" mkdir "!BACKUP_PATH!"
 
-:: Clean up
-set PGPASSWORD=
+rem Set database password and run pg_dump
+SET PGPASSWORD=p0w2i8
+echo on
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -h localhost -p 5432 -U postgres -F p -v -f "!BACKUP_FILE!" finances
+
+endlocal
