@@ -1325,12 +1325,8 @@ POSTGRESQL:
         ('Pet'),                      -- ID 20
         ('Vehicle');                  -- ID 21
 
-
-
-
-
-
-
+        INSERT INTO categories (name) VALUES
+        ('Taxes and Fees');         
 
 
 
@@ -1354,6 +1350,12 @@ POSTGRESQL:
         ('Butcher', 1),
         ('Farmers Market', 1),
         ('Bakery', 1),
+
+
+        INSERT INTO subcategories (name, category_id) VALUES
+        -- Food (1)
+        ('supermarket', 1);
+
 
         -- Health (10)
         ('Gym and Fitness', 10),
@@ -1393,6 +1395,40 @@ POSTGRESQL:
         ('Leasing', 21),
         ('Car Maintenance', 21),
         ('Car Insurance', 21);
+
+
+        -- Grocery
+        INSERT INTO subcategories (name, category_id) VALUES
+        ('Fruits and Vegetables', 19),
+        ('Meat and Seafood', 19),
+        ('Pantry Items', 19);        
+
+
+        -- Bills
+        INSERT INTO subcategories (name, category_id) VALUES
+        ('Electricity', 2),
+        ('Water', 2),
+        ('Internet', 2)
+        ('Rent', 2);
+
+        -- Home
+        INSERT INTO subcategories (name, category_id) VALUES
+        ('Furniture', 11),
+        ('Appliances', 11),
+        ('Maintenance', 11);
+
+        -- Clothing
+        INSERT INTO subcategories (name, category_id) VALUES
+        ('Men', 4),
+        ('Women', 4),
+        ('Children', 4);
+
+
+        -- Hobbies and Leisure Activities
+        INSERT INTO subcategories (name, category_id) VALUES
+        ('Crafts', 17),
+        ('Sports Equipment', 17),
+        ('Workshops', 17);
 
 
 

@@ -183,6 +183,8 @@ ORDER BY t.purchase_date DESC, user_id;
 
 
 
+        INSERT INTO categories (name) VALUES
+        ('Taxes and Fees');         
 
 
 
@@ -522,8 +524,7 @@ WHERE t.user_id = 1
 
 
 -- -------------------------------------------------------------------------------------------------------------------------------------
-
--- test and my analizes 
+-- my analizes and UPDATES
 
 
 
@@ -715,6 +716,196 @@ GROUP BY
 
 
 
+
+
+
+
+
+
+
+
+-- all tables
+SELECT * FROM "account";
+SELECT * FROM "banks_company";
+SELECT * FROM "categories";
+SELECT * FROM "categories_income";
+SELECT * FROM "companies";
+SELECT * FROM "credit_cards";
+SELECT * FROM "income";
+SELECT * FROM "payment_methods";
+SELECT * FROM "subcategories";
+SELECT * FROM "transactions";
+SELECT * FROM "user_activity";
+SELECT * FROM "users";
+
+
+
+
+
+
+
+SELECT * FROM "categories";
+
+
+SELECT * FROM "subcategories";
+
+
+SELECT DISTINCT(category_id) FROM  "subcategories";
+
+
+
+SELECT DISTINCT c.name, sub.category_id
+FROM subcategories sub
+INNER JOIN categories c 
+ON sub.category_id = c.id;
+
+
+SELECT * FROM categories
+WHERE id NOT IN (10, 11, 19, 21, 12, 15, 1, 4, 20, 2, 17);
+
+
+SELECT * FROM companies
+
+SELECT t.title, c.name
+FROM transactions t
+INNER JOIN companies c
+ON t.company_id = c.id
+WHERE c.name = 'Amazon Prime'
+
+SELECT * FROM categories
+SELECT * FROM  transactions t
+
+SELECT t.id , t.title, co.name , ca.name
+FROM transactions t
+INNER JOIN companies co ON t.company_id = co.id
+INNER JOIN categories ca ON t.category_id = ca.id
+WHERE co.name = 'Amazon Prime'
+
+
+-- UPDATE transactions
+SET category_id = 18
+where id = 11
+
+ -- UPDATE transactions
+SET date_record = '2025-05-05'
+WHERE id in (21, 22, 23, 26, 39, 41, 42  );
+
+
+
+SELECT t.title,  
+FROM transactions t
+INNER JOIN companies co ON t.company_id = co.id
+
+
+
+
+        -- Grocery
+        --INSERT INTO subcategories (name, category_id) VALUES
+        ('Fruits and Vegetables', 19),
+        ('Meat and Seafood', 19),
+        ('Pantry Items', 19);     
+
+
+
+
+        --INSERT INTO subcategories (name, category_id) VALUES
+        -- Food (1)
+        ('supermarket', 1);
+
+
+
+-- Bills
+-- INSERT INTO subcategories (name, category_id) VALUES
+('Electricity', 2),
+('Water', 2),
+('Internet', 2);
+
+
+
+-- Home
+-- INSERT INTO subcategories (name, category_id) VALUES
+('Furniture', 11),
+('Appliances', 11),
+('Maintenance', 11);
+
+
+
+
+        -- Bills
+       -- INSERT INTO subcategories (name, category_id) VALUES
+        ('Rent', 2);
+
+
+
+
+
+
+
+        -- Clothing
+      --  INSERT INTO subcategories (name, category_id) VALUES
+        ('Men', 4),
+        ('Women', 4),
+        ('Children', 4);
+
+
+-- Hobbies and Leisure Activities
+--INSERT INTO subcategories (name, category_id) VALUES
+('Crafts', 17),
+('Sports Equipment', 17),
+('Workshops', 17);
+
+
+
+SELECT * from transactions t 
+
+
+SELECT t.id, t.title, t.description, co.name, ca.name, t.category_id
+FROM transactions t 
+INNER JOIN companies co ON t.company_id = co.id
+INNER JOIN categories ca ON t.category_id = ca.id 
+WHERE co.name = 'MEI Gov'
+
+SELECT SUM(amount)
+FROM transactions t 
+INNER JOIN companies co ON t.company_id = co.id
+WHERE co.name = 'MEI Gov'
+
+
+-- UPDATE transactions
+SET category_id = 22
+WHERE id = 9
+
+
+
+
+
+
+
+
+SELECT SUM(t.amount)
+FROM transactions t
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30';
+
+
+
+
+
+SELECT * from transactions
+
+
+
+SELECT pa.method, SUM(t.amount)
+FROM transactions t
+INNER JOIN payment_methods pa ON t.payment_method_id = pa.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY pa.method;
+
+
+
+
+
+
+
 -- -------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -722,7 +913,7 @@ GROUP BY
 -- Database backup and restore commands
 
 -- Backup the 'finances' database
-"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
+--"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
 "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_22042025_New.sql" finances
 
 
@@ -732,7 +923,7 @@ GROUP BY
 "C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres -h localhost -p 5432 finances_Homolog
 
 -- Restore the backup into the 'finances_Homolog' database
-"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
+--"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
 
 "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_Homolog < "C:\PostgreSQL\finances_22042025.sql"
 
