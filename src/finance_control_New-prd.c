@@ -16,6 +16,9 @@
 
 
 
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +36,7 @@ void printMenu();
 void getCurrentDate(char *date);
 void detect_os();
 void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int subcategory_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id);
-void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record);
+void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record, int account_id);
 void viewTransactions(PGconn *conn, int user_id);
 void viewIncome(PGconn *conn);
 void viewCategories(PGconn *conn);
@@ -313,22 +316,73 @@ void viewAccounts(PGconn *conn, int user_id) {
 
 
 // Function to add income
-void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record) {
-    char query[512];
-    snprintf(query, sizeof(query), 
-             "INSERT INTO income (description, amount, category_income_id, payment_method_id, date_record) "
-             "VALUES ('%s', %.2f, %d, %d, '%s')", 
-             description, amount, category_income_id, payment_method_id, date_record);
-
-    PGresult *res = PQexec(conn, query);
+void addIncome(PGconn *conn, const char *description, float amount, int category_income_id, int payment_method_id, const char *date_record, int account_id) {
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        fprintf(stderr, "Income insertion failed: %s", PQerrorMessage(conn));
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
         PQclear(res);
         return;
     }
     PQclear(res);
-    printf("Income added successfully!\n");
+    
+    // Insert income record
+    char query[512];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO income (description, amount, category_income_id, payment_method_id, date_record, account_id) "
+             "VALUES ('%s', %.2f, %d, %d, '%s', %d)", 
+             description, amount, category_income_id, payment_method_id, date_record, account_id);
+
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Income insertion failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Update account balance
+    char update_query[256];
+    snprintf(update_query, sizeof(update_query),
+             "UPDATE account SET balance = balance + %.2f WHERE id = %d",
+             amount, account_id);
+    
+    res = PQexec(conn, update_query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Account balance update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    printf("Income added and account updated successfully!\n");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -390,10 +444,13 @@ void viewTransactions(PGconn *conn, int user_id) {
 
 // Function to view income
 void viewIncome(PGconn *conn) {
-    const char *query = "SELECT i.id, i.description, i.amount, ci.name AS category, pm.method AS payment_method, i.date_record, i.date "
+    const char *query = "SELECT i.id, i.description, i.amount, ci.name AS category, "
+                        "pm.method AS payment_method, a.title_account AS account, "
+                        "i.date_record, i.date "
                         "FROM income i "
                         "LEFT JOIN categories_income ci ON i.category_income_id = ci.id "
                         "LEFT JOIN payment_methods pm ON i.payment_method_id = pm.id "
+                        "LEFT JOIN account a ON i.account_id = a.id "
                         "ORDER BY i.date DESC";
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -406,21 +463,43 @@ void viewIncome(PGconn *conn) {
     if (rows == 0) {
         printf("No income records found.\n");
     } else {
-        printf("ID | Description       | Amount  | Category      | Payment Method | Date Record | Date\n");
-        printf("------------------------------------------------------------------------------------\n");
+        printf("ID | Description       | Amount  | Category      | Payment Method | Account       | Date Record | Date\n");
+        printf("------------------------------------------------------------------------------------------------------\n");
         for (int i = 0; i < rows; i++) {
-            printf("%s | %-17s | %-7s | %-13s | %-14s | %-11s | %s\n",
-                   PQgetvalue(res, i, 0),
-                   PQgetvalue(res, i, 1),
-                   PQgetvalue(res, i, 2),
-                   PQgetvalue(res, i, 3),
-                   PQgetvalue(res, i, 4),
-                   PQgetvalue(res, i, 5),
-                   PQgetvalue(res, i, 6));
+            printf("%s | %-17s | %-7s | %-13s | %-14s | %-13s | %-11s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Description
+                   PQgetvalue(res, i, 2),  // Amount
+                   PQgetvalue(res, i, 3),  // Category
+                   PQgetvalue(res, i, 4),  // Payment Method
+                   PQgetvalue(res, i, 5),  // Account
+                   PQgetvalue(res, i, 6),  // Date Record
+                   PQgetvalue(res, i, 7)); // Date
         }
     }
     PQclear(res);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Function to view transaction categories
 void viewCategories(PGconn *conn) {
@@ -1004,21 +1083,24 @@ int main() {
         scanf("%d", &choice);
 
         switch (choice) {
-            case 1: // Add Income
-                printf("Enter description: ");
-                scanf(" %[^\n]", description);
-                printf("Enter amount: ");
-                scanf("%f", &amount);
-                viewIncomeCategories(conn);
-                printf("Enter income category ID: ");
-                scanf("%d", &category_income_id);
-                viewPaymentMethods(conn);
-                printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card): ");
-                scanf("%d", &payment_method_id);
-                printf("Enter date record (YYYY-MM-DD): ");
-                scanf(" %[^\n]", date_record);
-                addIncome(conn, description, amount, category_income_id, payment_method_id, date_record);
-                break;
+                case 1: // Add Income
+                    printf("Enter description: ");
+                    scanf(" %[^\n]", description);
+                    printf("Enter amount: ");
+                    scanf("%f", &amount);
+                    viewIncomeCategories(conn);
+                    printf("Enter income category ID: ");
+                    scanf("%d", &category_income_id);
+                    viewPaymentMethods(conn);
+                    printf("Enter payment method ID (1 for Cash, 2 for Credit Card, 3 for Debit Card): ");
+                    scanf("%d", &payment_method_id);
+                    viewAccounts(conn, user_id);  // Show available accounts
+                    printf("Enter account ID to receive the income: ");
+                    scanf("%d", &account_id);
+                    printf("Enter date record (YYYY-MM-DD): ");
+                    scanf(" %[^\n]", date_record);
+                    addIncome(conn, description, amount, category_income_id, payment_method_id, date_record, account_id);
+                break;            
                 case 2: { // Add Expense
                     char title[100];
                     char purchase_date[11]; // YYYY-MM-DD format
@@ -1590,6 +1672,17 @@ POSTGRESQL:
 
 
 
+                
+        -- NEW CHANGE:about reference the income fk to account 
+        ALTER TABLE income
+        ADD COLUMN account_id INT REFERENCES account(id) ON DELETE SET NULL;
+
+
+
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
@@ -1662,9 +1755,6 @@ LINUX preparation:
 
 
 */
-
-
-
 
 
 
