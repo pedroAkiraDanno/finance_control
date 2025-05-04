@@ -1681,6 +1681,31 @@ POSTGRESQL:
 
 
 
+        CREATE TABLE account_type (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(50) UNIQUE NOT NULL
+        );
+
+        INSERT INTO account_type (name) VALUES
+        ('Savings'),
+        ('Checking'),
+        ('Investment');
+
+
+        -- NEW CHANGE: add foreign key account_type_id to account table
+        ALTER TABLE account
+        ADD COLUMN account_type_id INT REFERENCES account_type(id) ON DELETE SET NULL;
+
+
+        ALTER TABLE account
+        ADD COLUMN institution_name VARCHAR(100),
+        ADD COLUMN agency_number VARCHAR(20),
+        ADD COLUMN account_number VARCHAR(30);
+
+
+
+
+
 
 
             -- psql -d database -U user
