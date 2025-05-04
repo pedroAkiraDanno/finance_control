@@ -145,6 +145,22 @@ ORDER BY all_Sum_byMonth;
 
 
 
+-- Summing the total amount by subcategory for the current month, including category name
+SELECT 
+    c.name AS category,
+    sc.name AS subcategory,
+    SUM(t.amount) AS all_Sum_byMonth
+FROM transactions t
+LEFT JOIN subcategories sc ON t.subcategory_id = sc.id
+LEFT JOIN categories c ON sc.category_id = c.id
+WHERE EXTRACT(MONTH FROM t.date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY c.name, sc.name
+ORDER BY all_Sum_byMonth DESC;
+
+
+
+
 
 -- -------------------------------------------------------------------------------------------------------------------------------------
 
@@ -183,7 +199,7 @@ ORDER BY t.purchase_date DESC, user_id;
 
 
 
-        INSERT INTO categories (name) VALUES
+       -- INSERT INTO categories (name) VALUES
         ('Taxes and Fees');         
 
 
