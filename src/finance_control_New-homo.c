@@ -83,6 +83,10 @@ void displayIntroduction() {
 
 
 
+
+
+
+
 void printMenu() {
     printf("1. Add Income (e.g., Salary)\n");
     printf("2. Add Expense\n");
@@ -100,8 +104,13 @@ void printMenu() {
     printf("14. View User Activity\n");
     printf("15. Add Category\n");
     printf("16. Add Subcategory\n");  // New option
-    printf("17. Exit\n");
+    printf("17. Transfer Between Accounts\n");  // New option
+    printf("18. View Transfer History\n");     // New option    
+    printf("19. Exit\n");
 }
+
+
+
 
 
 
@@ -766,6 +775,166 @@ void addSubcategory(PGconn *conn) {
 
 
 
+// Function to transfer money between accounts
+void transferBetweenAccounts(PGconn *conn, int user_id) {
+    int from_account_id, to_account_id;
+    float amount;
+    char description[100];
+    char current_date[11];
+    
+    // View user's accounts
+    viewAccounts(conn, user_id);
+    
+    // Get transfer details
+    printf("\nEnter FROM account ID: ");
+    scanf("%d", &from_account_id);
+    printf("Enter TO account ID: ");
+    scanf("%d", &to_account_id);
+    printf("Enter amount to transfer: ");
+    scanf("%f", &amount);
+    printf("Enter description (optional): ");
+    scanf(" %[^\n]", description);
+    
+    // Get current date
+    getCurrentDate(current_date);
+    
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Check if FROM account has sufficient balance
+    char check_balance_query[256];
+    snprintf(check_balance_query, sizeof(check_balance_query),
+             "SELECT balance FROM account WHERE id = %d AND user_id = %d",
+             from_account_id, user_id);
+    
+    res = PQexec(conn, check_balance_query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Failed to check account balance: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    
+    float current_balance = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    
+    if (current_balance < amount) {
+        printf("Insufficient balance in the source account!\n");
+        PQexec(conn, "ROLLBACK");
+        return;
+    }
+    
+    // Deduct from FROM account
+    char deduct_query[256];
+    snprintf(deduct_query, sizeof(deduct_query),
+             "UPDATE account SET balance = balance - %.2f WHERE id = %d",
+             amount, from_account_id);
+    
+    res = PQexec(conn, deduct_query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to deduct from account: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Add to TO account
+    char add_query[256];
+    snprintf(add_query, sizeof(add_query),
+             "UPDATE account SET balance = balance + %.2f WHERE id = %d",
+             amount, to_account_id);
+    
+    res = PQexec(conn, add_query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add to account: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Record the transfer
+    char transfer_query[512];
+    snprintf(transfer_query, sizeof(transfer_query),
+             "INSERT INTO transf_account (from_account_id, to_account_id, amount, transfer_date, description) "
+             "VALUES (%d, %d, %.2f, '%s', '%s')",
+             from_account_id, to_account_id, amount, current_date, description);
+    
+    res = PQexec(conn, transfer_query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to record transfer: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    printf("Successfully transferred %.2f from account %d to account %d\n", amount, from_account_id, to_account_id);
+}
+
+// Function to view transfer history
+void viewTransferHistory(PGconn *conn, int user_id) {
+    char query[1024];
+    snprintf(query, sizeof(query),
+             "SELECT t.id, a1.title_account AS from_account, "
+             "a2.title_account AS to_account, t.amount, t.transfer_date, t.description "
+             "FROM transf_account t "
+             "JOIN account a1 ON t.from_account_id = a1.id "
+             "JOIN account a2 ON t.to_account_id = a2.id "
+             "WHERE a1.user_id = %d OR a2.user_id = %d "
+             "ORDER BY t.transfer_date DESC",
+             user_id, user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No transfer history found.\n");
+    } else {
+        printf("ID | From Account      | To Account        | Amount  | Transfer Date | Description\n");
+        printf("--------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-17s | %-17s | %-7s | %-13s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // From Account
+                   PQgetvalue(res, i, 2),  // To Account
+                   PQgetvalue(res, i, 3),  // Amount
+                   PQgetvalue(res, i, 4),  // Transfer Date
+                   PQgetvalue(res, i, 5)); // Description
+        }
+    }
+    PQclear(res);
+}
+
+
+
+
+
+
+
+
+
 
 
 int main() {
@@ -1041,19 +1210,25 @@ int main() {
                     }
                     break;
             }
-        case 16: // Add Subcategory
-            addSubcategory(conn);
-            break;
-            case 17: // Exit
+            case 16: // Add Subcategory
+                addSubcategory(conn);
+                break;
+            case 17: // Transfer Between Accounts
+                transferBetweenAccounts(conn, user_id);
+                break;
+            case 18: // View Transfer History
+                viewTransferHistory(conn, user_id);
+                break;
+            case 19: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
                 exit(0);
             default:
                 printf("Invalid choice. Please try again.\n");
-        }
-        printf("Press Enter to continue...");
-        getchar(); getchar(); // Wait for Enter key
+            }
+            printf("Press Enter to continue...");
+            getchar(); getchar(); // Wait for Enter key
     }
 
     PQfinish(conn);
@@ -1394,6 +1569,19 @@ POSTGRESQL:
 
 
 
+
+        CREATE TABLE transf_account (
+            id SERIAL PRIMARY KEY,
+            from_account_id INT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+            to_account_id INT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+            amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
+            transfer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+        );
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
@@ -1466,11 +1654,6 @@ LINUX preparation:
 
 
 */
-
-
-
-
-
 
 
 
