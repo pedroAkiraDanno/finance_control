@@ -19,6 +19,7 @@ order by tables;
 
 -- all tables
 SELECT * FROM "account";
+SELECT * FROM "account_type";
 SELECT * FROM "banks_company";
 SELECT * FROM "categories";
 SELECT * FROM "categories_income";
@@ -28,6 +29,7 @@ SELECT * FROM "income";
 SELECT * FROM "payment_methods";
 SELECT * FROM "subcategories";
 SELECT * FROM "transactions";
+SELECT * FROM "transf_account";
 SELECT * FROM "user_activity";
 SELECT * FROM "users";
 
@@ -48,8 +50,11 @@ SELECT SUM(amount) as all_Sum FROM "transactions";
 -- Summing the total amount from the "transactions" table for the current month Manual
 SELECT SUM(amount) AS all_Sum
 FROM "transactions"
-WHERE EXTRACT(MONTH FROM date_record) = 4
+WHERE EXTRACT(MONTH FROM date_record) = 5
   AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE);
+
+
+
 
 
 -- Summing the total amount from the "transactions" table for the current month Automatic
@@ -110,6 +115,16 @@ WHERE EXTRACT(MONTH FROM t.date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
   AND EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
 GROUP BY cc.card_name;
 
+
+SELECT * FROM transactions t 
+
+-- Summing the total amount by credit card name, grouped by month and repeated transactions by this mouth 
+SELECT cc.card_name, SUM(t.amount) AS all_Sum_byMonth_Repeated
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+WHERE EXTRACT(MONTH FROM t.date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY cc.card_name;
 
 
 
@@ -525,7 +540,7 @@ LEFT JOIN account a ON t.account_id = a.id
 WHERE t.user_id = 1 
   AND EXTRACT(MONTH FROM date_record) = EXTRACT(MONTH FROM CURRENT_DATE)
   AND EXTRACT(YEAR FROM date_record) = EXTRACT(YEAR FROM CURRENT_DATE)
-  AND cc.card_name = 'c6'
+  --AND cc.card_name = 'c6'
 -- Optional: Filter for specific company
 -- AND co.name = 'Uber'
 --ORDER BY t.purchase_date DESC;
@@ -730,6 +745,18 @@ GROUP BY
 
 
 
+--SELECT * FROM payment_methods
+SELECT 
+    pm.method AS payment_method, SUM(t.amount) AS total_amount
+FROM transactions t
+LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+WHERE 
+    pm.method IN ('Credit Card', 'Debit Card')
+    AND t.purchase_date BETWEEN DATE '2025-04-01' AND DATE '2025-04-30'
+GROUP BY 
+    pm.method;
+
+
 
 
 
@@ -808,7 +835,7 @@ WHERE id in (21, 22, 23, 26, 39, 41, 42  );
 
 
 
-SELECT t.title,  
+SELECT t.title
 FROM transactions t
 INNER JOIN companies co ON t.company_id = co.id
 

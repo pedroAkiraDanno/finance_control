@@ -18,7 +18,6 @@
 
 
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,13 +48,14 @@ void registerUser(PGconn *conn);
 int  loginUser(PGconn *conn, int *user_id);
 void addBankCompany(PGconn *conn, const char *name, const char *location); // Add this
 void viewBankCompanies(PGconn *conn); // Add this
-void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id); // Update this
+void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id, const char *institution_name, const char *agency_number, const char *account_number,  int account_type_id);
 void viewAccounts(PGconn *conn, int user_id); // Update this
 void recordLoginActivity(PGconn *conn, int user_id);
 void recordLogoutActivity(PGconn *conn, int user_id);
 void addCategory(PGconn *conn, int is_income_category);
 void viewSubcategories(PGconn *conn, int category_id);
 void addSubcategory(PGconn *conn);
+void viewAccountTypes(PGconn *conn);
 
 
 
@@ -252,22 +252,26 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
 
 
 
-// Function to add a bank company
-void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, int banks_company_id) {
-    char query[256];
-    snprintf(query, sizeof(query), 
-             "INSERT INTO account (title_account, balance, banks_company_id, user_id) "
-             "VALUES ('%s', %.2f, %d, %d)", 
-             title_account, balance, banks_company_id, user_id);
+void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, 
+    int banks_company_id, const char *institution_name, 
+    const char *agency_number, const char *account_number, 
+    int account_type_id) {
+char query[512];
+snprintf(query, sizeof(query), 
+ "INSERT INTO account (title_account, balance, banks_company_id, user_id, "
+ "institution_name, agency_number, account_number, account_type_id) "
+ "VALUES ('%s', %.2f, %d, %d, '%s', '%s', '%s', %d)", 
+ title_account, balance, banks_company_id, user_id, 
+ institution_name, agency_number, account_number, account_type_id);
 
-    PGresult *res = PQexec(conn, query);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        fprintf(stderr, "Account insertion failed: %s", PQerrorMessage(conn));
-        PQclear(res);
-        return;
-    }
-    PQclear(res);
-    printf("Account added successfully!\n");
+PGresult *res = PQexec(conn, query);
+if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+fprintf(stderr, "Account insertion failed: %s", PQerrorMessage(conn));
+PQclear(res);
+return;
+}
+PQclear(res);
+printf("Account added successfully!\n");
 }
 
 
@@ -278,13 +282,17 @@ void addAccount(PGconn *conn, int user_id, const char *title_account, float bala
 
 
 
-// Function to view bank companies
+
+
+
 void viewAccounts(PGconn *conn, int user_id) {
-    char query[512];
+    char query[1024];
     snprintf(query, sizeof(query),
-             "SELECT a.id, a.title_account, a.balance, b.name AS bank_name "
+             "SELECT a.id, a.title_account, a.balance, b.name AS bank_name, "
+             "a.institution_name, a.agency_number, a.account_number, at.name AS account_type "
              "FROM account a "
              "LEFT JOIN banks_company b ON a.banks_company_id = b.id "
+             "LEFT JOIN account_type at ON a.account_type_id = at.id "
              "WHERE a.user_id = %d "
              "ORDER BY a.id", user_id);
 
@@ -296,17 +304,24 @@ void viewAccounts(PGconn *conn, int user_id) {
     }
 
     int rows = PQntuples(res);
-    printf("ID | Account Title     | Balance  | Bank Name\n");
-    printf("--------------------------------------------\n");
+    printf("ID | Account Title     | Balance  | Bank Name       | Institution    | Agency   | Account Number | Type\n");
+    printf("--------------------------------------------------------------------------------------------------------\n");
     for (int i = 0; i < rows; i++) {
-        printf("%s | %-17s | %-8s | %s\n",
-               PQgetvalue(res, i, 0),
-               PQgetvalue(res, i, 1),
-               PQgetvalue(res, i, 2),
-               PQgetvalue(res, i, 3));
+        printf("%s | %-17s | %-8s | %-15s | %-14s | %-8s | %-14s | %s\n",
+               PQgetvalue(res, i, 0),  // ID
+               PQgetvalue(res, i, 1),  // title_account
+               PQgetvalue(res, i, 2),  // balance
+               PQgetvalue(res, i, 3),  // bank_name
+               PQgetvalue(res, i, 4),  // institution_name
+               PQgetvalue(res, i, 5),  // agency_number
+               PQgetvalue(res, i, 6),  // account_number
+               PQgetvalue(res, i, 7)); // account_type
     }
     PQclear(res);
 }
+
+
+
 
 
 
@@ -1017,7 +1032,25 @@ void viewTransferHistory(PGconn *conn, int user_id) {
 
 
 
+void viewAccountTypes(PGconn *conn) {
+    const char *query = "SELECT * FROM account_type ORDER BY id";
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
 
+    int rows = PQntuples(res);
+    printf("ID | Account Type\n");
+    printf("----------------\n");
+    for (int i = 0; i < rows; i++) {
+        printf("%s | %s\n",
+               PQgetvalue(res, i, 0),
+               PQgetvalue(res, i, 1));
+    }
+    PQclear(res);
+}
 
 
 
@@ -1264,17 +1297,33 @@ int main() {
                 scanf(" %[^\n]", company_location);
                 addBankCompany(conn, company_name, company_location);
                 break;            
-            case 11: // Add Account
-                printf("Enter account title: ");
-                scanf(" %[^\n]", description);
-                printf("Enter initial balance: ");
-                scanf("%f", &amount);
-                viewBankCompanies(conn);
-                printf("Enter bank company ID: ");
-                scanf("%d", &category_id);
-                addAccount(conn, user_id, description, amount, category_id);
-                break;
-            
+            case 11:  // Add Account
+                    char title_account[100], institution_name[100], agency_number[20], account_number[30];
+                    float balance;
+                    int banks_company_id, account_type_id;
+                    
+                    printf("Enter account title: ");
+                    scanf(" %[^\n]", title_account);
+                    printf("Enter initial balance: ");
+                    scanf("%f", &balance);
+                    printf("Enter institution name: ");
+                    scanf(" %[^\n]", institution_name);
+                    printf("Enter agency number: ");
+                    scanf(" %[^\n]", agency_number);
+                    printf("Enter account number: ");
+                    scanf(" %[^\n]", account_number);
+                    
+                    viewBankCompanies(conn);
+                    printf("Enter bank company ID: ");
+                    scanf("%d", &banks_company_id);
+                    
+                    viewAccountTypes(conn);
+                    printf("Enter account type ID: ");
+                    scanf("%d", &account_type_id);
+                    
+                    addAccount(conn, user_id, title_account, balance, banks_company_id, 
+                               institution_name, agency_number, account_number, account_type_id);
+            break;     
             case 12: // View Accounts
                 viewAccounts(conn, user_id); // Pass user_id
                 break;            
@@ -1652,13 +1701,11 @@ POSTGRESQL:
 
 
 
+
+
+
         ALTER TABLE transactions 
         ADD COLUMN subcategory_id INT REFERENCES subcategories(id) ON DELETE SET NULL;
-
-
-
-
-
 
         CREATE TABLE transf_account (
             id SERIAL PRIMARY KEY,
@@ -1669,10 +1716,7 @@ POSTGRESQL:
             description TEXT
         );
 
-
-
-
-                
+ 
         -- NEW CHANGE:about reference the income fk to account 
         ALTER TABLE income
         ADD COLUMN account_id INT REFERENCES account(id) ON DELETE SET NULL;
@@ -1681,6 +1725,9 @@ POSTGRESQL:
 
 
 
+
+
+        -- TITLE: Add Account Type and Account Metadata Enhancements       
         CREATE TABLE account_type (
             id SERIAL PRIMARY KEY,
             name VARCHAR(50) UNIQUE NOT NULL
@@ -1701,6 +1748,13 @@ POSTGRESQL:
         ADD COLUMN institution_name VARCHAR(100),
         ADD COLUMN agency_number VARCHAR(20),
         ADD COLUMN account_number VARCHAR(30);
+
+
+
+
+
+
+
 
 
 
@@ -1780,17 +1834,6 @@ LINUX preparation:
 
 
 */
-
-
-
-
-
-
-
-
-
-
-
 
 
 
