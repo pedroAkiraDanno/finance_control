@@ -7,6 +7,13 @@
 
 
 
+
+
+
+
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,7 +171,18 @@ void detect_os() {
     #endif
 }
 
+
+
 void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, int category_id, int subcategory_id, int payment_method_id, const char *company_name, const char *company_location, const char *date_record, const char *purchase_date, int credit_card_id, int is_repeated, int account_id) {
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+
     char query[512];
     char account_id_str[20]; // Buffer to hold the account_id as a string or "NULL"
     char subcategory_id_str[20]; // Buffer to hold the subcategory_id as a string or "NULL"
@@ -207,6 +225,7 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         if (PQresultStatus(company_res) != PGRES_COMMAND_OK) {
             fprintf(stderr, "Company insertion failed: %s", PQerrorMessage(conn));
             PQclear(company_res);
+            PQexec(conn, "ROLLBACK");
             return;
         }
         PQclear(company_res);
@@ -226,15 +245,49 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         }
     }
 
-    PGresult *res = PQexec(conn, query);
+    res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         fprintf(stderr, "Transaction failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
         PQclear(res);
         return;
     }
     PQclear(res);
+
+    // Update account balance if payment method is Cash (1), Debit Card (3), or Pix (4)
+    if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
+        if (account_id != -1) {
+            char update_query[256];
+            snprintf(update_query, sizeof(update_query),
+                     "UPDATE account SET balance = balance - %.2f WHERE id = %d",
+                     amount, account_id);
+            
+            res = PQexec(conn, update_query);
+            if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                fprintf(stderr, "Account balance update failed: %s", PQerrorMessage(conn));
+                PQexec(conn, "ROLLBACK");
+                PQclear(res);
+                return;
+            }
+            PQclear(res);
+        }
+    }
+
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
     printf("Transaction added successfully!\n");
+    if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
+        printf("Account balance updated (reduced by %.2f)\n", amount);
+    }
 }
+
 
 
 
@@ -1122,7 +1175,7 @@ int main() {
                     printf("Enter date record (YYYY-MM-DD): ");
                     scanf(" %[^\n]", date_record);
                     addIncome(conn, description, amount, category_income_id, payment_method_id, date_record, account_id);
-                break;            
+                break;
                 case 2: { // Add Expense
                     char title[100];
                     char purchase_date[11]; // YYYY-MM-DD format
@@ -1248,15 +1301,42 @@ int main() {
                     printf("Enter purchase date (YYYY-MM-DD): ");
                     scanf(" %[^\n]", purchase_date);
                     
-                    // Ask for account ID for all payment methods
-                    viewAccounts(conn, user_id);
-                    printf("Enter account ID (or -1 if not applicable): ");
-                    scanf("%d", &account_id);
+                    // Ask for account ID for Cash, Debit Card, or Pix payments
+                    if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
+                        viewAccounts(conn, user_id);
+                        printf("Enter account ID to deduct from: ");
+                        scanf("%d", &account_id);
+                        
+                        // Verify account has sufficient balance
+                        char balance_query[256];
+                        snprintf(balance_query, sizeof(balance_query),
+                                 "SELECT balance FROM account WHERE id = %d AND user_id = %d",
+                                 account_id, user_id);
+                        
+                        PGresult *balance_res = PQexec(conn, balance_query);
+                        if (PQresultStatus(balance_res) != PGRES_TUPLES_OK || PQntuples(balance_res) == 0) {
+                            fprintf(stderr, "Failed to check account balance: %s", PQerrorMessage(conn));
+                            PQclear(balance_res);
+                            break;
+                        }
+                        
+                        float current_balance = atof(PQgetvalue(balance_res, 0, 0));
+                        PQclear(balance_res);
+                        
+                        if (current_balance < amount) {
+                            printf("Error: Insufficient balance in account (Current balance: %.2f)\n", current_balance);
+                            break;
+                        }
+                    } else {
+                        account_id = -1; // Not applicable for credit card payments
+                    }
                     
-                    addTransaction(conn, user_id, title, description, amount, "expense", category_id, subcategory_id, payment_method_id, company_name, company_location, date_record, purchase_date, credit_card_id, is_repeated, account_id);
-                    break;
-                }            
-  
+                    addTransaction(conn, user_id, title, description, amount, "expense", 
+                                  category_id, subcategory_id, payment_method_id, 
+                                  company_name, company_location, date_record, purchase_date, 
+                                  credit_card_id, is_repeated, account_id);
+                break;
+                }
             case 3: // View Transactions
                 viewTransactions(conn, user_id); // Pass user_id
                 break;
@@ -1823,6 +1903,36 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
