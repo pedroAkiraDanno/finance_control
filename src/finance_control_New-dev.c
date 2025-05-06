@@ -1940,7 +1940,17 @@ POSTGRESQL:
 
 
 
-
+        -- Spending Limits Table using NUMERIC for financial accuracy
+        CREATE TABLE spending_limits (
+            id SERIAL PRIMARY KEY,
+            category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            limit_amount NUMERIC(10, 2) NOT NULL CHECK (limit_amount >= 0),
+            current_value NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (current_value >= 0),
+            period VARCHAR(20) CHECK (period IN ('monthly', 'yearly')) NOT NULL DEFAULT 'monthly',
+            start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE
+        );
 
 
 

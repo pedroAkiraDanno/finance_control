@@ -8,12 +8,6 @@
 
 
 
-
-
-
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -110,10 +104,12 @@ void printMenu() {
     printf("13. View Bank Companies\n");
     printf("14. View User Activity\n");
     printf("15. Add Category\n");
-    printf("16. Add Subcategory\n");  // New option
-    printf("17. Transfer Between Accounts\n");  // New option
-    printf("18. View Transfer History\n");     // New option    
-    printf("19. Exit\n");
+    printf("16. Add Subcategory\n");
+    printf("17. Transfer Between Accounts\n");
+    printf("18. View Transfer History\n");
+    printf("19. Add Spending Limit\n");  // New option
+    printf("20. View Spending Limits\n"); // New option
+    printf("21. Exit\n");
 }
 
 
@@ -1097,6 +1093,122 @@ void viewAccountTypes(PGconn *conn) {
 
 
 
+// Function to add a new spending limit
+void addSpendingLimit(PGconn *conn, int user_id) {
+    int category_id;
+    float limit_amount;
+    char period[20];
+    
+    // View available categories
+    viewCategories(conn);
+    
+    printf("Enter category ID for the spending limit: ");
+    scanf("%d", &category_id);
+    
+    printf("Enter limit amount: ");
+    scanf("%f", &limit_amount);
+    
+    printf("Enter period (monthly/yearly): ");
+    scanf(" %[^\n]", period);
+    
+    // Validate period
+    if (strcmp(period, "monthly") != 0 && strcmp(period, "yearly") != 0) {
+        printf("Invalid period. Must be 'monthly' or 'yearly'.\n");
+        return;
+    }
+    
+    char query[512];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO spending_limits (category_id, user_id, limit_amount, period) "
+             "VALUES (%d, %d, %.2f, '%s')", 
+             category_id, user_id, limit_amount, period);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add spending limit: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Spending limit added successfully!\n");
+}
+
+
+
+// Function to view spending limits with current spending
+void viewSpendingLimits(PGconn *conn, int user_id) {
+    char query[1024];
+    
+    // First, update all current_values based on actual spending
+    snprintf(query, sizeof(query),
+             "UPDATE spending_limits sl "
+             "SET current_value = ("
+             "    SELECT COALESCE(SUM(t.amount), 0) "
+             "    FROM transactions t "
+             "    WHERE t.category_id = sl.category_id "
+             "    AND t.user_id = sl.user_id "
+             "    AND t.type = 'expense' "
+             "    AND CASE "
+             "        WHEN sl.period = 'monthly' THEN "
+             "            EXTRACT(MONTH FROM t.date_record) = EXTRACT(MONTH FROM CURRENT_DATE) "
+             "            AND EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE) "
+             "        WHEN sl.period = 'yearly' THEN "
+             "            EXTRACT(YEAR FROM t.date_record) = EXTRACT(YEAR FROM CURRENT_DATE) "
+             "    END"
+             ") "
+             "WHERE sl.user_id = %d", user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to update spending limits: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Now select the limits with current spending
+    snprintf(query, sizeof(query),
+             "SELECT sl.id, c.name AS category, sl.limit_amount, sl.current_value, "
+             "sl.period, sl.start_date, sl.is_enabled, "
+             "CASE WHEN sl.current_value >= sl.limit_amount THEN 'OVER LIMIT' "
+             "     WHEN sl.current_value >= sl.limit_amount * 0.9 THEN 'NEAR LIMIT' "
+             "     ELSE 'UNDER LIMIT' END AS status "
+             "FROM spending_limits sl "
+             "JOIN categories c ON sl.category_id = c.id "
+             "WHERE sl.user_id = %d "
+             "ORDER BY status, c.name", user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No spending limits found.\n");
+    } else {
+        printf("ID | Category          | Limit Amount | Current Spending | Period   | Start Date | Status      | Enabled\n");
+        printf("------------------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-17s | %-12s | %-16s | %-8s | %-10s | %-11s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Category
+                   PQgetvalue(res, i, 2),  // Limit Amount
+                   PQgetvalue(res, i, 3),  // Current Value
+                   PQgetvalue(res, i, 4),  // Period
+                   PQgetvalue(res, i, 5),  // Start Date
+                   PQgetvalue(res, i, 7),  // Status
+                   PQgetvalue(res, i, 6)); // Is Enabled
+        }
+    }
+    PQclear(res);
+}
+
+
+
+
 
 
 int main() {
@@ -1427,7 +1539,14 @@ int main() {
             case 18: // View Transfer History
                 viewTransferHistory(conn, user_id);
                 break;
-            case 19: // Exit
+            // In the main function's switch statement:
+            case 19: // Add Spending Limit
+                addSpendingLimit(conn, user_id);
+                break;
+            case 20: // View Spending Limits
+                viewSpendingLimits(conn, user_id);
+                break;
+            case 21: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
@@ -1822,7 +1941,17 @@ POSTGRESQL:
 
 
 
-
+        -- Spending Limits Table using NUMERIC for financial accuracy
+        CREATE TABLE spending_limits (
+            id SERIAL PRIMARY KEY,
+            category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            limit_amount NUMERIC(10, 2) NOT NULL CHECK (limit_amount >= 0),
+            current_value NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (current_value >= 0),
+            period VARCHAR(20) CHECK (period IN ('monthly', 'yearly')) NOT NULL DEFAULT 'monthly',
+            start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE
+        );
 
 
 
@@ -1903,6 +2032,22 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
