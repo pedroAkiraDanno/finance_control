@@ -6,18 +6,26 @@
 ## NOTES
 
 
+
 Transfer accounts - OK
-Set limits
+Set limits        - OK 
 Goals
 Alerts and notifications
 Installments
 Salary | investments
 Borrow
 pay invoices for example also
-changing "income"
+changing "income"   - OK 
 bug "debit card" dont show the cards
 
 For me, Investamos is another program but I don't know
+
+
+
+
+
+
+
 
 
 > Copyright 05/05/2025 - 2030
