@@ -949,6 +949,28 @@ GROUP BY pa.method;
 
 
 
+
+
+
+
+SELECT * FROM account
+SELECT * FROM credit_cards
+
+SELECT ac.title_account, ca.card_name, t.purchase_date, *
+FROM transactions t 
+INNER JOIN account ac ON t.account_id = ac.id
+INNER JOIN credit_cards ca ON t.credit_card_id = ca.id
+WHERE ac.id  = 1
+ORDER BY t.id
+
+
+--UPDATE transactions
+SET purchase_date = '2025-04-02'
+WHERE id = 48
+
+
+
+
 -- -------------------------------------------------------------------------------------------------------------------------------------
 
 
