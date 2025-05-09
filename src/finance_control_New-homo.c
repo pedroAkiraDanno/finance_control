@@ -8,6 +8,17 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,7 +120,11 @@ void printMenu() {
     printf("18. View Transfer History\n");
     printf("19. Add Spending Limit\n");  // New option
     printf("20. View Spending Limits\n"); // New option
-    printf("21. Exit\n");
+    printf("21. Generate Invoices\n");
+    printf("22. View Invoices\n");
+    printf("23. Pay Invoice\n");
+    printf("24. View Invoice Details\n");    
+    printf("25. Exit\n");
 }
 
 
@@ -1211,6 +1226,374 @@ void viewSpendingLimits(PGconn *conn, int user_id) {
 
 
 
+
+
+void generateInvoices(PGconn *conn, int user_id) {
+    char current_date[11];
+    getCurrentDate(current_date);
+    
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Corrected query that joins with transactions to get user_id
+    char query[2048];
+    snprintf(query, sizeof(query),
+        "WITH user_credit_cards AS ("
+        "  SELECT DISTINCT cc.id, cc.card_name, cc.closes_on_day, cc.due_day "
+        "  FROM credit_cards cc "
+        "  JOIN transactions t ON cc.id = t.credit_card_id "
+        "  WHERE t.user_id = %d"
+        "), "
+        "card_periods AS ("
+        "  SELECT "
+        "    ucc.id AS credit_card_id, "
+        "    CASE "
+        "      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN "
+        "        DATE_TRUNC('month', CURRENT_DATE)::date + (ucc.closes_on_day - 1) * INTERVAL '1 day' "
+        "      ELSE "
+        "        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day' "
+        "    END AS invoice_date, "
+        "    CASE "
+        "      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN "
+        "        DATE_TRUNC('month', CURRENT_DATE)::date + (ucc.due_day - 1) * INTERVAL '1 day' "
+        "      ELSE "
+        "        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.due_day - 1) * INTERVAL '1 day' "
+        "    END AS due_date, "
+        "    CASE "
+        "      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN "
+        "        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day' "
+        "      ELSE "
+        "        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '2 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day' "
+        "    END AS period_start "
+        "  FROM user_credit_cards ucc"
+        ") "
+        "INSERT INTO invoices (credit_card_id, user_id, invoice_date, due_date, total_amount) "
+        "SELECT cp.credit_card_id, %d, cp.invoice_date, cp.due_date, "
+        "       COALESCE(SUM(t.amount), 0) AS total_amount "
+        "FROM card_periods cp "
+        "LEFT JOIN transactions t ON t.credit_card_id = cp.credit_card_id "
+        "                       AND t.purchase_date >= cp.period_start "
+        "                       AND t.purchase_date < cp.invoice_date "
+        "                       AND t.user_id = %d "
+        "WHERE NOT EXISTS ("
+        "  SELECT 1 FROM invoices i "
+        "  WHERE i.credit_card_id = cp.credit_card_id "
+        "  AND i.invoice_date = cp.invoice_date"
+        ") "
+        "GROUP BY cp.credit_card_id, cp.invoice_date, cp.due_date "
+        "HAVING COALESCE(SUM(t.amount), 0) > 0",
+        user_id, user_id, user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Invoice generation failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    
+    int rows_affected = atoi(PQcmdTuples(res));
+    PQclear(res);
+    
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    printf("Generated %d new invoices.\n", rows_affected);
+}
+
+
+
+
+
+
+// Function to view invoices
+void viewInvoices(PGconn *conn, int user_id) {
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT i.id, cc.card_name, i.invoice_date, i.due_date, "
+        "i.total_amount, i.paid_amount, i.status, "
+        "(i.total_amount - i.paid_amount) AS remaining_amount "
+        "FROM invoices i "
+        "JOIN credit_cards cc ON i.credit_card_id = cc.id "
+        "WHERE i.user_id = %d "
+        "ORDER BY i.status, i.due_date", user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No invoices found.\n");
+    } else {
+        printf("ID | Credit Card      | Invoice Date | Due Date   | Total Amount | Paid Amount | Remaining | Status\n");
+        printf("------------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-16s | %-12s | %-10s | %-12s | %-11s | %-9s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Card Name
+                   PQgetvalue(res, i, 2),  // Invoice Date
+                   PQgetvalue(res, i, 3),  // Due Date
+                   PQgetvalue(res, i, 4),  // Total Amount
+                   PQgetvalue(res, i, 5),  // Paid Amount
+                   PQgetvalue(res, i, 7),  // Remaining Amount
+                   PQgetvalue(res, i, 6)); // Status
+        }
+    }
+    PQclear(res);
+}
+
+// Function to pay an invoice
+void payInvoice(PGconn *conn, int user_id) {
+    // Show unpaid invoices first
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT i.id, cc.card_name, i.invoice_date, i.due_date, "
+        "i.total_amount, i.paid_amount, "
+        "(i.total_amount - i.paid_amount) AS remaining_amount "
+        "FROM invoices i "
+        "JOIN credit_cards cc ON i.credit_card_id = cc.id "
+        "WHERE i.user_id = %d AND i.status != 'paid' "
+        "ORDER BY i.due_date", user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No unpaid invoices found.\n");
+        PQclear(res);
+        return;
+    }
+    
+    printf("Unpaid Invoices:\n");
+    printf("ID | Credit Card      | Invoice Date | Due Date   | Total Amount | Paid Amount | Remaining\n");
+    printf("---------------------------------------------------------------------------------------\n");
+    for (int i = 0; i < rows; i++) {
+        printf("%s | %-16s | %-12s | %-10s | %-12s | %-11s | %s\n",
+               PQgetvalue(res, i, 0),  // ID
+               PQgetvalue(res, i, 1),  // Card Name
+               PQgetvalue(res, i, 2),  // Invoice Date
+               PQgetvalue(res, i, 3),  // Due Date
+               PQgetvalue(res, i, 4),  // Total Amount
+               PQgetvalue(res, i, 5),  // Paid Amount
+               PQgetvalue(res, i, 6)); // Remaining Amount
+    }
+    PQclear(res);
+    
+    // Get invoice ID to pay
+    int invoice_id;
+    printf("Enter invoice ID to pay: ");
+    scanf("%d", &invoice_id);
+    
+    float payment_amount;
+    printf("Enter payment amount: ");
+    scanf("%f", &payment_amount);
+    
+    int account_id;
+    viewAccounts(conn, user_id);
+    printf("Select account to pay from: ");
+    scanf("%d", &account_id);
+    
+    // Start transaction
+    res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // 1. Verify invoice exists and get remaining amount
+    snprintf(query, sizeof(query),
+        "SELECT (total_amount - paid_amount) AS remaining "
+        "FROM invoices WHERE id = %d AND user_id = %d FOR UPDATE", 
+        invoice_id, user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Invalid invoice ID or not your invoice: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    
+    float remaining_amount = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    
+    if (payment_amount > remaining_amount) {
+        printf("Payment amount (%.2f) exceeds remaining amount (%.2f).\n", payment_amount, remaining_amount);
+        PQexec(conn, "ROLLBACK");
+        return;
+    }
+    
+    // 2. Verify account has sufficient balance
+    snprintf(query, sizeof(query),
+        "SELECT balance FROM account WHERE id = %d AND user_id = %d FOR UPDATE", 
+        account_id, user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Invalid account ID or not your account: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    
+    float account_balance = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    
+    if (account_balance < payment_amount) {
+        printf("Insufficient funds in account (balance: %.2f).\n", account_balance);
+        PQexec(conn, "ROLLBACK");
+        return;
+    }
+    
+    // 3. Update invoice
+    snprintf(query, sizeof(query),
+        "UPDATE invoices "
+        "SET paid_amount = paid_amount + %.2f, "
+        "    status = CASE WHEN (paid_amount + %.2f) >= total_amount THEN 'paid' ELSE status END, "
+        "    updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = %d", 
+        payment_amount, payment_amount, invoice_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Invoice update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // 4. Deduct from account
+    snprintf(query, sizeof(query),
+        "UPDATE account SET balance = balance - %.2f WHERE id = %d", 
+        payment_amount, account_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Account update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // 5. Record the payment transaction
+    char current_date[11];
+    getCurrentDate(current_date);
+    
+    snprintf(query, sizeof(query),
+        "INSERT INTO transactions (title, description, amount, type, "
+        "category_id, payment_method_id, date_record, purchase_date, "
+        "account_id, user_id) "
+        "VALUES ('Invoice Payment', 'Payment for invoice #%d', %.2f, 'expense', "
+        "6, 3, '%s', '%s', %d, %d)",  // Assuming category_id 6 is "Credit Card Payments"
+        invoice_id, payment_amount, current_date, current_date, account_id, user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Transaction recording failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    printf("Payment of %.2f applied to invoice #%d successfully!\n", payment_amount, invoice_id);
+}
+
+// Function to view invoice details (transactions)
+void viewInvoiceDetails(PGconn *conn, int user_id) {
+    // Show invoices first
+    viewInvoices(conn, user_id);
+    
+    int invoice_id;
+    printf("Enter invoice ID to view details: ");
+    scanf("%d", &invoice_id);
+    
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT t.id, t.title, t.description, t.amount, t.purchase_date, "
+        "c.name AS category, sc.name AS subcategory "
+        "FROM transactions t "
+        "JOIN invoices i ON t.credit_card_id = i.credit_card_id "
+        "LEFT JOIN categories c ON t.category_id = c.id "
+        "LEFT JOIN subcategories sc ON t.subcategory_id = sc.id "
+        "WHERE i.id = %d AND i.user_id = %d "
+        "AND t.purchase_date >= ("
+        "  SELECT DATE_TRUNC('month', i.invoice_date - INTERVAL '1 month') + "
+        "         (cc.closes_on_day - 1) * INTERVAL '1 day' "
+        "  FROM credit_cards cc "
+        "  WHERE cc.id = i.credit_card_id"
+        ") "
+        "AND t.purchase_date < i.invoice_date "
+        "ORDER BY t.purchase_date", invoice_id, user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No transactions found for this invoice.\n");
+    } else {
+        printf("Invoice #%d Details:\n", invoice_id);
+        printf("ID | Title            | Description       | Amount  | Purchase Date | Category    | Subcategory\n");
+        printf("-------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-15s | %-17s | %-7s | %-13s | %-11s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Title
+                   PQgetvalue(res, i, 2),  // Description
+                   PQgetvalue(res, i, 3),  // Amount
+                   PQgetvalue(res, i, 4),  // Purchase Date
+                   PQgetvalue(res, i, 5),  // Category
+                   PQgetvalue(res, i, 6)); // Subcategory
+        }
+    }
+    PQclear(res);
+}
+
+
+
+
+
+
+
 int main() {
     const char *conninfo = "dbname=finances_Homolog user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
@@ -1546,7 +1929,20 @@ int main() {
             case 20: // View Spending Limits
                 viewSpendingLimits(conn, user_id);
                 break;
-            case 21: // Exit
+            // In the main function's switch statement:
+            case 21: // Generate Invoices
+                generateInvoices(conn, user_id);
+                break;
+            case 22: // View Invoices
+                viewInvoices(conn, user_id);
+                break;
+            case 23: // Pay Invoice
+                payInvoice(conn, user_id);
+                break;
+            case 24: // View Invoice Details
+                viewInvoiceDetails(conn, user_id);
+                break;
+            case 25: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
@@ -1956,6 +2352,20 @@ POSTGRESQL:
 
 
 
+        CREATE TABLE invoices (
+            id SERIAL PRIMARY KEY,
+            credit_card_id INTEGER REFERENCES credit_cards(id),
+            user_id INTEGER REFERENCES users(id),
+            invoice_date DATE NOT NULL,
+            due_date DATE NOT NULL,
+            total_amount DECIMAL(10, 2) NOT NULL,
+            paid_amount DECIMAL(10, 2) DEFAULT 0.00,
+            status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'overdue')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );        
+
+
 
 
 
@@ -2032,6 +2442,137 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

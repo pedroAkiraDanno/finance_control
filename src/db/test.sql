@@ -248,3 +248,153 @@ Investimos para mim é outro programa mas não sei
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Invoice #3 Details:
+ID | Title            | Description       | Amount  | Purchase Date | Category    | Subcategory
+-------------------------------------------------------------------------------------------
+47 | Smart Fit       | Smart Fit Gym     | 149.05  | 2025-04-02    | Health      | Gym and Fitness
+50 | Sugar in Sant Marche | Pay half with mother sugar and my credit card Sant Marche | 1.39    | 2025-04-27    | Food        | Lunch
+
+
+21 - OK 
+23 - OK 
+22 - OK 
+26 - OK 
+49 - OK 
+39 - OK 
+41 - OK 
+42 - OK 
+
+
+50 
+47
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Invoice #14 Details:
+ID | Title            | Description       | Amount  | Purchase Date | Category    | Subcategory
+-------------------------------------------------------------------------------------------
+15 | Uber Travel     | Uber to Recanto Paulista Because my ankle. | 21.93   | 2025-04-01    | Transport   |
+16 | Uber Travel     | Uber to Recanto Paulista to work and help my father. | 24.94   | 2025-04-02    | Transport   |
+46 | Google GSUITE   | Google GSUITE to my Google Drive 2TB | 70.00   | 2025-04-05    | Services    |
+20 | Jet Scooter     | Use jet Scooter with Saty and Gio, to back gym to home. because the car was broke. | 17.78   | 2025-04-11    | Transport   |
+28 | Uber Trip       | Uber Shopping Vila Olimpia to Home, because the car was broke. | 16.47   | 2025-04-12    | Transport   |
+25 | Uber Trip       | Uber Church to Home, because the car was broke | 10.98   | 2025-04-13    | Transport   |
+24 | Uber Trip       | Uber Home to Church with my father and gradmother because the car was broke | 13.94   | 2025-04-13    | Transport   |
+51 | Uber to Church  | Uber Sp to Church because the car mechanic | 10.92   | 2025-04-27    | Transport   | Taxi and Ride Apps
+52 | Uber Church to Home | Uber Church to Home because mechanic | 10.99   | 2025-04-27    | Transport   | Taxi and Ride Apps
+
+
+15
+16
+46
+20
+28
+25
+24
+52
+
+
+
+11
+12
+20
+28
+31
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------------------------
+
+
+
+
+-- FIX TO INVOICE 
+
+
+
+-- gendai 
+-- OK 
+
+-- lunna 
+UPDATE transactions
+SET purchase_date = '2025-04-02'
+WHERE id = 48 
+
+
+-- sugar 
+DELETE FROM transactions
+WHERE id = 50;
+-- need add again 
+
+
+UPDATE Transactions 
+SET amount = 26.5 
+WHERE id = 41
+
+
+
+
+
+-- c6 fix 
+
+
+
+
+
+
+
+-----------------------------------
+
+
