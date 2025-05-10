@@ -971,6 +971,91 @@ WHERE id = 48
 
 
 
+
+
+
+
+
+
+
+
+
+-- -------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+WITH user_credit_cards AS (
+  SELECT DISTINCT cc.id, cc.card_name, cc.closes_on_day, cc.due_day
+  FROM credit_cards cc
+  JOIN transactions t ON cc.id = t.credit_card_id
+  WHERE t.user_id = %d
+),
+card_periods AS (
+  SELECT
+    ucc.id AS credit_card_id,
+    CASE
+      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN
+        DATE_TRUNC('month', CURRENT_DATE)::date + (ucc.closes_on_day - 1) * INTERVAL '1 day'
+      ELSE
+        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day'
+    END AS invoice_date,
+    CASE
+      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN
+        DATE_TRUNC('month', CURRENT_DATE)::date + (ucc.due_day - 1) * INTERVAL '1 day'
+      ELSE
+        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.due_day - 1) * INTERVAL '1 day'
+    END AS due_date,
+    CASE
+      WHEN EXTRACT(DAY FROM CURRENT_DATE) >= ucc.closes_on_day THEN
+        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day'
+      ELSE
+        DATE_TRUNC('month', CURRENT_DATE - INTERVAL '2 month')::date + (ucc.closes_on_day - 1) * INTERVAL '1 day'
+    END AS period_start
+  FROM user_credit_cards ucc
+)
+SELECT cp.credit_card_id, %d AS user_id, cp.invoice_date, cp.due_date,
+       COALESCE(SUM(t.amount), 0) AS total_amount
+FROM card_periods cp
+LEFT JOIN transactions t ON t.credit_card_id = cp.credit_card_id
+                         AND t.purchase_date >= cp.period_start
+                         AND t.purchase_date < cp.invoice_date
+                         AND t.user_id = %d
+WHERE NOT EXISTS (
+  SELECT 1 FROM invoices i
+  WHERE i.credit_card_id = cp.credit_card_id
+  AND i.invoice_date = cp.invoice_date
+)
+GROUP BY cp.credit_card_id, cp.invoice_date, cp.due_date
+HAVING COALESCE(SUM(t.amount), 0) > 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- -------------------------------------------------------------------------------------------------------------------------------------
 
 
