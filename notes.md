@@ -11,7 +11,7 @@ Transfer accounts - OK
 Set limits        - OK 
 Goals
 Alerts and notifications
-Installments        **** more difficult
+Installments        **** more difficult - OK 
 Salary | investments
 Borrow
 pay invoices for example also  **** more difficult  - OK 
