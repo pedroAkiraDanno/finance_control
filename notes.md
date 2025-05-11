@@ -18,6 +18,7 @@ pay invoices for example also  **** more difficult  - OK
 changing "income"   - OK  
 bug "debit card" dont show the cards
 
+
 For me, Investamos is another program but I don't know
 
 
