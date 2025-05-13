@@ -15,8 +15,6 @@
 
 
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +59,10 @@ void addCategory(PGconn *conn, int is_income_category);
 void viewSubcategories(PGconn *conn, int category_id);
 void addSubcategory(PGconn *conn);
 void viewAccountTypes(PGconn *conn);
-
+// Add these declarations with the other function declarations
+void addDebitCard(PGconn *conn, int user_id);
+void viewDebitCards(PGconn *conn, int user_id);
+void updateDebitCard(PGconn *conn, int user_id);
 
 
 
@@ -128,7 +129,10 @@ void printMenu() {
     printf("22. View Invoices\n");
     printf("23. Pay Invoice\n");
     printf("24. View Invoice Details\n");    
-    printf("25. Exit\n");
+    printf("25. Add Debit Card\n");  // New option
+    printf("26. View Debit Cards\n"); // New option    
+    printf("27. Update Debit Card\n");  // New option  
+    printf("28. Exit\n");
 }
 
 
@@ -188,7 +192,6 @@ void detect_os() {
 
 
 
-
 void addTransaction(PGconn *conn, int user_id, const char *title, const char *description, float amount, const char *type, 
                    int category_id, int subcategory_id, int payment_method_id, const char *company_name, 
                    const char *company_location, const char *date_record, const char *purchase_date, 
@@ -212,7 +215,8 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
     char installment_value_str[20] = "NULL";
     char original_transaction_id_str[20] = "NULL";
     char company_id_str[20] = "NULL";
-    char credit_card_id_str[20];  // Added declaration for credit_card_id_str
+    char credit_card_id_str[20] = "NULL";
+    char debit_card_id_str[20] = "NULL";
 
     // Handle NULL values
     if (account_id == -1) strcpy(account_id_str, "NULL");
@@ -221,11 +225,33 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
     if (subcategory_id == -1) strcpy(subcategory_id_str, "NULL");
     else snprintf(subcategory_id_str, sizeof(subcategory_id_str), "%d", subcategory_id);
 
-    // Handle credit_card_id
-    if (payment_method_id == 2) {  // Only for credit cards
+    // Handle credit_card_id (only for credit card payments)
+    if (payment_method_id == 2) {
         snprintf(credit_card_id_str, sizeof(credit_card_id_str), "%d", credit_card_id);
-    } else {
-        strcpy(credit_card_id_str, "NULL");
+    }
+
+    // Handle debit_card_id (only for debit card payments)
+    if (payment_method_id == 3) {
+        viewDebitCards(conn, user_id);
+        int debit_card_id;
+        printf("Enter debit card ID: ");
+        scanf("%d", &debit_card_id);
+        snprintf(debit_card_id_str, sizeof(debit_card_id_str), "%d", debit_card_id);
+        
+        // Get the linked account ID for the debit card
+        char get_account_query[256];
+        snprintf(get_account_query, sizeof(get_account_query),
+                "SELECT account_id FROM debit_cards WHERE id = %d", debit_card_id);
+        PGresult *account_res = PQexec(conn, get_account_query);
+        if (PQresultStatus(account_res) != PGRES_TUPLES_OK || PQntuples(account_res) == 0) {
+            fprintf(stderr, "Failed to get debit card account: %s", PQerrorMessage(conn));
+            PQclear(account_res);
+            PQexec(conn, "ROLLBACK");
+            return;
+        }
+        account_id = atoi(PQgetvalue(account_res, 0, 0));
+        snprintf(account_id_str, sizeof(account_id_str), "%d", account_id);
+        PQclear(account_res);
     }
 
     // Handle company information if provided
@@ -277,12 +303,13 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
     // Insert the main transaction
     snprintf(query, sizeof(query), 
              "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, "
-             "payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id, "
+             "payment_method_id, date_record, purchase_date, credit_card_id, debit_card_id, is_repeated, account_id, user_id, "
              "is_installment, installment_number, total_installments, installment_value, company_id, original_transaction_id) "
-             "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', %s, %s, %s, %d, %s, %s, %s, %s, %s, %s) RETURNING id",
+             "VALUES ('%s', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', %s, %s, %s, %s, %d, %s, %s, %s, %s, %s, %s) RETURNING id",
              title, description, amount, type, category_id, subcategory_id_str, payment_method_id, 
              date_record, purchase_date, 
-             credit_card_id_str,  // Changed to use the prepared string
+             credit_card_id_str,  // Credit card ID (NULL if not credit card)
+             debit_card_id_str,   // Debit card ID (NULL if not debit card)
              is_repeated ? "TRUE" : "FALSE", 
              account_id_str, user_id, is_installment_str, installment_number_str, 
              total_installments_str, installment_value_str, company_id_str, original_transaction_id_str);
@@ -295,8 +322,6 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         return;
     }
 
-
-    
     // Get the ID of the newly inserted transaction (for installments)
     int original_transaction_id = -1;
     if (is_installment && PQntuples(res) > 0) {
@@ -330,11 +355,13 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
             // Create the installment transaction
             snprintf(query, sizeof(query), 
                      "INSERT INTO transactions (title, description, amount, type, category_id, subcategory_id, "
-                     "payment_method_id, date_record, purchase_date, credit_card_id, is_repeated, account_id, user_id, "
+                     "payment_method_id, date_record, purchase_date, credit_card_id, debit_card_id, is_repeated, account_id, user_id, "
                      "is_installment, installment_number, total_installments, installment_value, company_id, original_transaction_id) "
-                     "VALUES ('%s (Installment %d/%d)', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', %d, %s, %s, %d, TRUE, %d, %d, %.2f, %s, %d)", 
+                     "VALUES ('%s (Installment %d/%d)', '%s', %.2f, '%s', %d, %s, %d, '%s', '%s', %s, %s, %s, %s, %d, TRUE, %d, %d, %.2f, %s, %d)", 
                      title, i, total_installments, description, installment_value, type, category_id, subcategory_id_str, 
-                     payment_method_id, date_record, installment_purchase_date, credit_card_id, is_repeated ? "TRUE" : "FALSE", 
+                     payment_method_id, date_record, installment_purchase_date, 
+                     credit_card_id_str, debit_card_id_str,
+                     is_repeated ? "TRUE" : "FALSE", 
                      account_id_str, user_id, i, total_installments, installment_value, company_id_str, original_transaction_id);
 
             res = PQexec(conn, query);
@@ -348,7 +375,7 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         }
     }
 
-    // Update account balance for non-credit-card payments
+    // Update account balance for cash, debit card, or pix payments
     if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
         if (account_id != -1) {
             char update_query[256];
@@ -385,6 +412,8 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
         printf("Account balance updated (reduced by %.2f)\n", amount);
     }
 }
+
+
 
 
 
@@ -551,15 +580,13 @@ void addIncome(PGconn *conn, const char *description, float amount, int category
 
 
 
-
-
 void viewTransactions(PGconn *conn, int user_id) {
     char query[2048]; // Increased buffer size
     snprintf(query, sizeof(query),
              "SELECT t.id, t.title, t.description, t.amount, t.type, "
              "c.name AS category, sc.name AS subcategory, pm.method AS payment_method, "
              "co.name AS company, t.date_record, t.purchase_date, t.date, "
-             "cc.card_name, t.is_repeated, a.title_account AS account_name, "
+             "cc.card_name, dc.card_name AS debit_card, t.is_repeated, a.title_account AS account_name, "
              "t.is_installment, t.installment_number, t.total_installments, t.installment_value "
              "FROM transactions t "
              "LEFT JOIN categories c ON t.category_id = c.id "
@@ -567,6 +594,7 @@ void viewTransactions(PGconn *conn, int user_id) {
              "LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id "
              "LEFT JOIN companies co ON t.company_id = co.id "
              "LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id "
+             "LEFT JOIN debit_cards dc ON t.debit_card_id = dc.id "
              "LEFT JOIN account a ON t.account_id = a.id "
              "WHERE t.user_id = %d "
              "ORDER BY t.date DESC",
@@ -583,41 +611,44 @@ void viewTransactions(PGconn *conn, int user_id) {
     if (rows == 0) {
         printf("No transactions found.\n");
     } else {
-        printf("ID | Title            | Description       | Amount  | Type    | Category      | Subcategory    | Payment Method | Company        | Date Record | Purchase Date | Date       | Credit Card | Repeated | Account | Installment\n");
-        printf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+        // Updated header to include Debit Card column
+        printf("ID | Title            | Description       | Amount  | Type    | Category      | Subcategory    | Payment Method | Company        | Date Record | Purchase Date | Date       | Credit Card | Debit Card  | Repeated | Account | Installment\n");
+        printf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
         for (int i = 0; i < rows; i++) {
-            const char *is_installment = PQgetvalue(res, i, 15);
+            const char *is_installment = PQgetvalue(res, i, 16); // Updated index for is_installment
             const char *installment_info = "";
             if (strcmp(is_installment, "t") == 0) {
                 char buf[50];
                 snprintf(buf, sizeof(buf), "%s/%s (%s)", 
-                         PQgetvalue(res, i, 16), PQgetvalue(res, i, 17), PQgetvalue(res, i, 18));
+                         PQgetvalue(res, i, 17), // installment_number
+                         PQgetvalue(res, i, 18), // total_installments
+                         PQgetvalue(res, i, 19)); // installment_value
                 installment_info = buf;
             }
             
-            printf("%s | %-15s | %-17s | %-7s | %-7s | %-13s | %-14s | %-14s | %-14s | %-11s | %-12s | %s | %-11s | %s | %s | %s\n",
-                   PQgetvalue(res, i, 0),  // ID
-                   PQgetvalue(res, i, 1),  // Title
-                   PQgetvalue(res, i, 2),  // Description
-                   PQgetvalue(res, i, 3),  // Amount
-                   PQgetvalue(res, i, 4),  // Type
-                   PQgetvalue(res, i, 5),  // Category
-                   PQgetvalue(res, i, 6),  // Subcategory
-                   PQgetvalue(res, i, 7),  // Payment Method
-                   PQgetvalue(res, i, 8),  // Company
-                   PQgetvalue(res, i, 9),  // Date Record
-                   PQgetvalue(res, i, 10), // Purchase Date
-                   PQgetvalue(res, i, 11), // Date
-                   PQgetvalue(res, i, 12), // Credit Card
-                   PQgetvalue(res, i, 13), // Repeated
-                   PQgetvalue(res, i, 14), // Account
-                   installment_info);      // Installment info
+            // Updated printf to include debit card information
+            printf("%s | %-15s | %-17s | %-7s | %-7s | %-13s | %-14s | %-14s | %-14s | %-11s | %-12s | %s | %-11s | %-11s | %s | %s | %s\n",
+                   PQgetvalue(res, i, 0),   // ID
+                   PQgetvalue(res, i, 1),   // Title
+                   PQgetvalue(res, i, 2),   // Description
+                   PQgetvalue(res, i, 3),   // Amount
+                   PQgetvalue(res, i, 4),   // Type
+                   PQgetvalue(res, i, 5),   // Category
+                   PQgetvalue(res, i, 6),   // Subcategory
+                   PQgetvalue(res, i, 7),   // Payment Method
+                   PQgetvalue(res, i, 8),   // Company
+                   PQgetvalue(res, i, 9),   // Date Record
+                   PQgetvalue(res, i, 10),  // Purchase Date
+                   PQgetvalue(res, i, 11),  // Date
+                   PQgetvalue(res, i, 12),  // Credit Card
+                   PQgetvalue(res, i, 13),  // Debit Card
+                   PQgetvalue(res, i, 14),  // is_repeated
+                   PQgetvalue(res, i, 15),  // Account
+                   installment_info);       // Installment info
         }
     }
     PQclear(res);
 }
-
-
 
 
 
@@ -1712,6 +1743,206 @@ void viewInvoiceDetails(PGconn *conn, int user_id) {
 
 
 
+// Function to add a new debit card
+void addDebitCard(PGconn *conn, int user_id) {
+    char card_name[100], card_number[20], expiration_date[11], cvv[5];
+    int account_id;
+    
+    viewAccounts(conn, user_id);
+    printf("Enter account ID to link to this debit card: ");
+    scanf("%d", &account_id);
+    
+    printf("Enter card name: ");
+    scanf(" %[^\n]", card_name);
+    printf("Enter card number: ");
+    scanf(" %[^\n]", card_number);
+    printf("Enter expiration date (YYYY-MM-DD): ");
+    scanf(" %[^\n]", expiration_date);
+    printf("Enter CVV: ");
+    scanf(" %[^\n]", cvv);
+    
+    char query[512];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO debit_cards (card_name, account_id, card_number, expiration_date, cvv, user_id) "
+             "VALUES ('%s', %d, '%s', '%s', '%s', %d)", 
+             card_name, account_id, card_number, expiration_date, cvv, user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Debit card insertion failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Debit card added successfully!\n");
+}
+
+// Function to view debit cards
+void viewDebitCards(PGconn *conn, int user_id) {
+    char query[512];
+    snprintf(query, sizeof(query),
+             "SELECT dc.id, dc.card_name, a.title_account, dc.card_number, "
+             "dc.expiration_date, dc.created_at "
+             "FROM debit_cards dc "
+             "JOIN account a ON dc.account_id = a.id "
+             "WHERE dc.user_id = %d "
+             "ORDER BY dc.id", user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    printf("ID | Card Name       | Linked Account   | Card Number   | Expiration | Created At\n");
+    printf("--------------------------------------------------------------------------------\n");
+    for (int i = 0; i < rows; i++) {
+        printf("%s | %-15s | %-16s | %-13s | %-10s | %s\n",
+               PQgetvalue(res, i, 0),  // ID
+               PQgetvalue(res, i, 1),  // Card Name
+               PQgetvalue(res, i, 2),  // Account
+               PQgetvalue(res, i, 3),  // Card Number
+               PQgetvalue(res, i, 4),  // Expiration
+               PQgetvalue(res, i, 5)); // Created At
+    }
+    PQclear(res);
+}
+
+
+
+void updateDebitCard(PGconn *conn, int user_id) {
+    int debit_card_id;
+    char new_card_name[100], new_expiration_date[11], new_cvv[5];
+    int update_name = 0, update_expiry = 0, update_cvv = 0;
+    
+    // Show user's debit cards
+    viewDebitCards(conn, user_id);
+    
+    printf("Enter the ID of the debit card to update: ");
+    if (scanf("%d", &debit_card_id) != 1) {
+        printf("Invalid input. Please enter a number.\n");
+        while (getchar() != '\n'); // Clear input buffer
+        return;
+    }
+    
+    // Verify the debit card belongs to the user
+    char verify_query[256];
+    snprintf(verify_query, sizeof(verify_query),
+             "SELECT card_name, expiration_date FROM debit_cards WHERE id = %d AND user_id = %d",
+             debit_card_id, user_id);
+    
+    PGresult *verify_res = PQexec(conn, verify_query);
+    if (PQresultStatus(verify_res) != PGRES_TUPLES_OK || PQntuples(verify_res) == 0) {
+        fprintf(stderr, "Invalid debit card ID or not your card\n");
+        PQclear(verify_res);
+        return;
+    }
+    
+    // Get current values
+    const char *current_name = PQgetvalue(verify_res, 0, 0);
+    const char *current_expiry = PQgetvalue(verify_res, 0, 1);
+    
+    // Ask which fields to update
+    printf("\nCurrent name: %s\n", current_name);
+    printf("Update name? (1 for Yes, 0 for No): ");
+    scanf("%d", &update_name);
+    
+    if (update_name) {
+        printf("Enter new card name: ");
+        scanf(" %[^\n]", new_card_name);
+    }
+    
+    printf("\nCurrent expiration date: %s\n", current_expiry);
+    printf("Update expiration date? (1 for Yes, 0 for No): ");
+    scanf("%d", &update_expiry);
+    
+    if (update_expiry) {
+        printf("Enter new expiration date (YYYY-MM-DD): ");
+        scanf(" %[^\n]", new_expiration_date);
+    }
+    
+    printf("\nUpdate CVV? (1 for Yes, 0 for No): ");
+    scanf("%d", &update_cvv);
+    
+    if (update_cvv) {
+        printf("Enter new CVV: ");
+        scanf(" %[^\n]", new_cvv);
+    }
+    
+    PQclear(verify_res);
+    
+    // Build the update query
+    char update_query[512] = "UPDATE debit_cards SET ";
+    int fields_to_update = 0;
+    
+    if (update_name) {
+        char escaped_name[200];
+        PQescapeStringConn(conn, escaped_name, new_card_name, strlen(new_card_name), NULL);
+        strcat(update_query, "card_name = '");
+        strcat(update_query, escaped_name);
+        strcat(update_query, "'");
+        fields_to_update++;
+    }
+    
+    if (update_expiry) {
+        if (fields_to_update > 0) strcat(update_query, ", ");
+        strcat(update_query, "expiration_date = '");
+        strcat(update_query, new_expiration_date);
+        strcat(update_query, "'");
+        fields_to_update++;
+    }
+    
+    if (update_cvv) {
+        if (fields_to_update > 0) strcat(update_query, ", ");
+        strcat(update_query, "cvv = '");
+        strcat(update_query, new_cvv);
+        strcat(update_query, "'");
+        fields_to_update++;
+    }
+    
+    if (fields_to_update == 0) {
+        printf("No fields selected for update.\n");
+        return;
+    }
+    
+    // Complete the query
+    strcat(update_query, " WHERE id = ");
+    char id_str[20];
+    snprintf(id_str, sizeof(id_str), "%d", debit_card_id);
+    strcat(update_query, id_str);
+    
+    // Execute the update
+    PGresult *res = PQexec(conn, update_query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Update failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    PQclear(res);
+    printf("\nDebit card updated successfully!\n");
+    
+    // Show the updated card
+    char show_query[256];
+    snprintf(show_query, sizeof(show_query),
+             "SELECT dc.id, dc.card_name, dc.expiration_date, dc.updated_at "
+             "FROM debit_cards dc "
+             "WHERE dc.id = %d", debit_card_id);
+    
+    res = PQexec(conn, show_query);
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        printf("\nUpdated Information:\n");
+        printf("ID: %s\n", PQgetvalue(res, 0, 0));
+        printf("Name: %s\n", PQgetvalue(res, 0, 1));
+        printf("Expiration Date: %s\n", PQgetvalue(res, 0, 2));
+        printf("Last Updated: %s\n", PQgetvalue(res, 0, 3));
+    }
+    PQclear(res);
+}
+
+
 
 
 
@@ -2081,7 +2312,16 @@ int main() {
             case 24: // View Invoice Details
                 viewInvoiceDetails(conn, user_id);
                 break;
-            case 25: // Exit
+            case 25: // Add Debit Card
+                addDebitCard(conn, user_id);
+                break;
+            case 26: // View Debit Cards
+                viewDebitCards(conn, user_id);
+                break;
+            case 27: // Update Debit Card
+                updateDebitCard(conn, user_id);
+                break;                
+            case 28: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
@@ -2521,6 +2761,51 @@ POSTGRESQL:
 
 
 
+        -- about debit card
+        CREATE TABLE debit_cards (
+            id SERIAL PRIMARY KEY,
+            card_name VARCHAR(100) NOT NULL,
+            account_id INTEGER REFERENCES account(id) NOT NULL,
+            card_number VARCHAR(20),
+            expiration_date DATE,
+            cvv VARCHAR(4),
+            user_id INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );        
+
+
+        ALTER TABLE transactions ADD COLUMN debit_card_id INTEGER REFERENCES debit_cards(id);
+
+
+        ALTER TABLE debit_cards
+        ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+        -- Create trigger function to auto-update 'updated_at'
+        CREATE OR REPLACE FUNCTION set_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+        NEW.updated_at = now();
+        RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        -- Drop old trigger if it exists (optional, for idempotency)
+        DROP TRIGGER IF EXISTS trg_set_updated_at ON debit_cards;
+
+        -- Create trigger to update 'updated_at' before any row update
+        CREATE TRIGGER trg_set_updated_at
+        BEFORE UPDATE ON debit_cards
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+
+
+
+
+
+
+
+
+
 
             -- psql -d database -U user
 
@@ -2594,6 +2879,7 @@ LINUX preparation:
 
 
 */
+
 
 
 
