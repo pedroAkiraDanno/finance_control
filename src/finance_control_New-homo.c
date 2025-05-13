@@ -1777,6 +1777,12 @@ void addDebitCard(PGconn *conn, int user_id) {
     printf("Debit card added successfully!\n");
 }
 
+
+
+
+
+
+
 // Function to view debit cards
 void viewDebitCards(PGconn *conn, int user_id) {
     char query[512];
@@ -1809,6 +1815,15 @@ void viewDebitCards(PGconn *conn, int user_id) {
     }
     PQclear(res);
 }
+
+
+
+
+
+
+
+
+
 
 
 
