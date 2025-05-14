@@ -16,8 +16,9 @@ Salary | investments
 Borrow
 pay invoices for example also  **** more difficult  - OK 
 changing "income"   - OK  
-bug "debit card" dont show the cards
-bug "ask for account in credit card"
+bug "debit card" dont show the cards    - OK 
+bug "ask for account in credit card"    - OK 
+put repited automatic 
 
 
 For me, Investamos is another program but I don't know

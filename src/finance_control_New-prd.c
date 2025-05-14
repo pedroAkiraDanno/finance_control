@@ -2788,6 +2788,8 @@ POSTGRESQL:
         ALTER TABLE debit_cards
         ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
+
+        
         -- Create trigger function to auto-update 'updated_at'
         CREATE OR REPLACE FUNCTION set_updated_at()
         RETURNS TRIGGER AS $$

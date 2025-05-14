@@ -1056,41 +1056,41 @@ HAVING COALESCE(SUM(t.amount), 0) > 0;
 SELECT * FROM  account;
 
 -- mercado pago 
-UPDATE account
+--UPDATE account
 SET balance = 2049.55
 WHERE ID = 1;
 
 -- c6 
-UPDATE account
+--UPDATE account
 SET balance = 0.82
 WHERE ID = 3;
 
 -- my wallet 
-UPDATE account
+--UPDATE account
 SET balance = 1268
 WHERE id = 5;
 
 -- inter
-UPDATE account
+--UPDATE account
 SET balance = 0.84
 WHERE id = 4;
 
 
 -- santander
-UPDATE account
+--UPDATE account
 SET balance = 1.79
 WHERE id = 7;
 
 
 -- picpay
-UPDATE account
+--UPDATE account
 SET balance = 1.33
 WHERE id = 6;
 
 
 
 -- itau
-UPDATE account
+--UPDATE account
 SET balance = 0.50
 WHERE id = 2;
 
@@ -1106,7 +1106,271 @@ SELECT * FROM account_type
 
 
 
+SELECT * FROM categories
 
+SELECT ca.name, *
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+
+
+
+SELECT SUM(amount) as sum, ca.name
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+GROUP BY ca.name
+ORDER BY sum
+
+
+SELECT SUM(amount) as sum, ca.name
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name
+ORDER BY sum
+
+
+
+SELECT SUM(amount) as sum, ca.name
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name
+ORDER BY sum
+
+
+SELECT SUM(amount) as sum, ca.name
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name
+ORDER BY sum
+
+
+
+SELECT 
+    ca.name AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name WITH ROLLUP;
+
+
+
+
+
+
+
+
+-- Per-category sums
+SELECT 
+    ca.name AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name
+UNION ALL
+-- Total sum
+SELECT 
+    'Total' AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30';
+
+
+
+
+SELECT 
+    COALESCE(ca.name, 'Total') AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY GROUPING SETS ((ca.name), ())
+ORDER BY 
+    CASE WHEN ca.name IS NULL THEN 1 ELSE 0 END,
+    sum;
+
+
+
+
+
+
+
+
+
+
+-- Per-category sums
+SELECT 
+    ca.name AS category,
+    AVG(t.amount) AS sum
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+--WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name
+UNION ALL
+-- Total sum
+SELECT 
+    'Total' AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30';
+
+
+
+
+
+
+SELECT 
+    TO_CHAR(t.purchase_date, 'YYYY-MM') AS month,
+    ca.name AS category,
+    SUM(t.amount) AS sum
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+GROUP BY GROUPING SETS (
+    (TO_CHAR(t.purchase_date, 'YYYY-MM'), ca.name),
+    (TO_CHAR(t.purchase_date, 'YYYY-MM')),
+    ()
+)
+ORDER BY
+    month NULLS LAST,
+    category NULLS LAST;
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT SUM(amount) as sum, ca.name as name, TO_CHAR(t.purchase_date, 'YYYY-MM') as MOUTH
+FROM transactions t
+INNER JOIN categories ca ON t.category_id = ca.id
+-- WHERE t.purchase_date BETWEEN '2025-04-01' AND '2025-04-30'
+GROUP BY ca.name, MOUTH, media
+ORDER BY name, sum
+
+
+
+SELECT 
+    SUM(t.amount) AS sum,
+    AVG(t.amount) AS media,
+    ca.name AS name,
+    TO_CHAR(t.purchase_date, 'YYYY-MM') AS mouth
+FROM transactions t
+JOIN categories ca ON t.category_id = ca.id
+GROUP BY ca.name, TO_CHAR(t.purchase_date, 'YYYY-MM')
+ORDER BY name, sum;
+
+
+select * from companies
+
+SELECT co.name, co.id,t.purchase_date, * 
+FROM transactions t
+INNER JOIN companies co ON t.company_id = co.id
+WHERE co.name = 'Amazon Prime'
+
+
+select * from categories
+SELECT su.id, su.name, su.category_id, ca.name 
+FROM subcategories su
+LEFT JOIN categories ca ON su.category_id = ca.id
+
+
+SELECT ca.id, ca.name, su.id AS subcategory_id, su.name AS subcategory_name
+FROM categories ca
+LEFT JOIN subcategories su ON su.category_id = ca.id
+
+
+
+SELECT * FROM companies
+
+SELECT co.name,t.purchase_date, * 
+FROM transactions t
+INNER JOIN companies co ON t.company_id = co.id
+WHERE co.name = 'Luuna Bed'
+
+
+7
+48
+
+
+
+
+SELECT * FROM categories
+
+DELETE FROM transactions
+WHERE id IN (7, 48);
+
+
+SELECT * FROM transactions
+WHERE id IN (7, 48);
+
+
+
+
+
+
+
+DELETE FROM transactions
+WHERE id IN (7, 48);
+
+
+SELECT * FROM transactions
+WHERE id IN (7, 48);
+
+SELECT * FROM transactions
+where company_id = 11
+
+
+
+
+SELECT co.name,t.purchase_date, * 
+FROM transactions t
+INNER JOIN companies co ON t.company_id = co.id
+WHERE co.name = 'Luuna Bed'
+
+
+
+
+
+
+SELECT * FROM transactions
+
+
+
+
+
+
+
+
+
+
+
+
+
+select * from account
+
+
+-- UPDATE account 
+SET balance = balance + 395.31
+WHERE id = 1;
+-- 2049.55 | 2444.86
+
+-- UPDATE account
+SET balance = balance + 239.84 
+WHERE id = 3; 
+-- 0.82 | 240.66
+
+-- UPDATE account 
+SET balance = balance + 433.20
+WHERE id = 4;
+-- 0.84 | 434.04
 
 
 
