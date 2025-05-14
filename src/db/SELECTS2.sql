@@ -26,7 +26,9 @@ SELECT * FROM "categories_income";
 SELECT * FROM "companies";
 SELECT * FROM "credit_cards";
 SELECT * FROM "income";
+SELECT * FROM "invoices";
 SELECT * FROM "payment_methods";
+SELECT * FROM "spending_limits";
 SELECT * FROM "subcategories";
 SELECT * FROM "transactions";
 SELECT * FROM "transf_account";
@@ -1042,10 +1044,64 @@ GROUP BY cp.credit_card_id, cp.invoice_date, cp.due_date
 HAVING COALESCE(SUM(t.amount), 0) > 0;
 
 
+127	"test credit card (Installment 64/64)"	"test credit card"	156.25	"expense"	"2025-05-05"	"2025-05-13"	1	2	1	2	true		1	"2030-08-05"	1	true	64	64	156.25	64	
+
+
+-- -------------------------------------------------------------------------------------------------------------------------------------
+
+-- test analyze and updates 
+
+
+
+SELECT * FROM  account;
+
+-- mercado pago 
+UPDATE account
+SET balance = 2049.55
+WHERE ID = 1;
+
+-- c6 
+UPDATE account
+SET balance = 0.82
+WHERE ID = 3;
+
+-- my wallet 
+UPDATE account
+SET balance = 1268
+WHERE id = 5;
+
+-- inter
+UPDATE account
+SET balance = 0.84
+WHERE id = 4;
+
+
+-- santander
+UPDATE account
+SET balance = 1.79
+WHERE id = 7;
+
+
+-- picpay
+UPDATE account
+SET balance = 1.33
+WHERE id = 6;
+
+
+
+-- itau
+UPDATE account
+SET balance = 0.50
+WHERE id = 2;
 
 
 
 
+SELECT * FROM  account;
+
+SELECT SUM(balance) FROM account;
+
+SELECT * FROM account_type
 
 
 

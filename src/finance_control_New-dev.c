@@ -91,7 +91,7 @@ void displayIntroduction() {
     printf(" |  _| | | | | | | | (_| | | | | | | (__  | | | (_| | | |   | (__  | (_) | | | | | | |_  | |    | (_) | | |\n");
     printf(" |_|   |_| |_| |_|  \\__,_| |_| |_|  \\___| |_|  \\__,_| |_|    \\___|  \\___/  |_| |_|  \\__| |_|     \\___/  |_|\n");
     printf("\n\n");
-    printf("Financial Control\n");
+    printf("Financial Control, Dev version\n");
     printf("Created by Pedro Akira, with C and PostgreSQL\n");
     printf("\n\n");
     printf("Press Enter to continue...");
@@ -2024,6 +2024,7 @@ int main() {
                     scanf(" %[^\n]", date_record);
                     addIncome(conn, description, amount, category_income_id, payment_method_id, date_record, account_id);
                 break;
+
                 case 2: { // Add Expense
                     char title[100];
                     char purchase_date[11]; // YYYY-MM-DD format
@@ -2074,8 +2075,41 @@ int main() {
                             installment_value = amount / total_installments;
                             printf("Each installment will be %.2f\n", installment_value);
                         }
+                        
+                        // Ask for account ID for credit card payments too
+                        viewAccounts(conn, user_id);
+                        printf("Enter account ID (for future payments): ");
+                        scanf("%d", &account_id);
                     } else {
                         credit_card_id = 0; // Not applicable for non-credit card payments
+                        if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
+                            viewAccounts(conn, user_id);
+                            printf("Enter account ID to deduct from: ");
+                            scanf("%d", &account_id);
+                            
+                            // Verify account has sufficient balance
+                            char balance_query[256];
+                            snprintf(balance_query, sizeof(balance_query),
+                                    "SELECT balance FROM account WHERE id = %d AND user_id = %d",
+                                    account_id, user_id);
+                            
+                            PGresult *balance_res = PQexec(conn, balance_query);
+                            if (PQresultStatus(balance_res) != PGRES_TUPLES_OK || PQntuples(balance_res) == 0) {
+                                fprintf(stderr, "Failed to check account balance: %s", PQerrorMessage(conn));
+                                PQclear(balance_res);
+                                break;
+                            }
+                            
+                            float current_balance = atof(PQgetvalue(balance_res, 0, 0));
+                            PQclear(balance_res);
+                            
+                            if (current_balance < amount) {
+                                printf("Error: Insufficient balance in account (Current balance: %.2f)\n", current_balance);
+                                break;
+                            }
+                        } else {
+                            account_id = -1; // Not applicable for other payment methods
+                        }
                     }
                     
                     printf("Is this transaction repeated? (1 for Yes, 0 for No): ");
@@ -2163,44 +2197,14 @@ int main() {
                     printf("Enter purchase date (YYYY-MM-DD): ");
                     scanf(" %[^\n]", purchase_date);
                     
-                    // Ask for account ID for Cash, Debit Card, or Pix payments
-                    if (payment_method_id == 1 || payment_method_id == 3 || payment_method_id == 4) {
-                        viewAccounts(conn, user_id);
-                        printf("Enter account ID to deduct from: ");
-                        scanf("%d", &account_id);
-                        
-                        // Verify account has sufficient balance
-                        char balance_query[256];
-                        snprintf(balance_query, sizeof(balance_query),
-                                "SELECT balance FROM account WHERE id = %d AND user_id = %d",
-                                account_id, user_id);
-                        
-                        PGresult *balance_res = PQexec(conn, balance_query);
-                        if (PQresultStatus(balance_res) != PGRES_TUPLES_OK || PQntuples(balance_res) == 0) {
-                            fprintf(stderr, "Failed to check account balance: %s", PQerrorMessage(conn));
-                            PQclear(balance_res);
-                            break;
-                        }
-                        
-                        float current_balance = atof(PQgetvalue(balance_res, 0, 0));
-                        PQclear(balance_res);
-                        
-                        if (current_balance < amount) {
-                            printf("Error: Insufficient balance in account (Current balance: %.2f)\n", current_balance);
-                            break;
-                        }
-                    } else {
-                        account_id = -1; // Not applicable for credit card payments
-                    }
-                    
                     addTransaction(conn, user_id, title, description, amount, "expense", 
                                 category_id, subcategory_id, payment_method_id, 
                                 company_name, company_location, date_record, purchase_date, 
                                 credit_card_id, is_repeated, account_id, is_installment, 
                                 total_installments, installment_value);
                     break;
-                }
-                
+                }                
+                                
 
             case 3: // View Transactions
                 viewTransactions(conn, user_id); // Pass user_id
