@@ -2813,6 +2813,12 @@ POSTGRESQL:
 
 
 
+-- Insert new category
+INSERT INTO categories (name) VALUES
+('Donate');
+
+
+
 
 
 

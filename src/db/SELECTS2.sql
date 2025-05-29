@@ -108,6 +108,188 @@ GROUP BY cc.card_name;
 
 
 
+-- Summing the total amount by credit card name, and showing % of total
+SELECT 
+    cc.card_name, 
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    ROUND(
+        100.0 * SUM(t.amount) / SUM(SUM(t.amount)) OVER (), 
+        2
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+SELECT 
+    cc.card_name, 
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / SUM(SUM(t.amount)) OVER (), 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name
+ORDER BY all_Sum_byMonth_Repeated desc
+
+
+
+SELECT 
+    cc.card_name, 
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / SUM(SUM(t.amount)) OVER (), 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+INNER JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name
+ORDER BY all_Sum_byMonth_Repeated desc
+
+
+
+-- Get total sum by card, and percentage without using OVER ()
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / total.total_amount, 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+-- Join with a subquery that calculates the total amount
+JOIN (
+    SELECT SUM(amount) AS total_amount
+    FROM transactions
+) total ON 1=1
+GROUP BY cc.card_name, total.total_amount;
+
+
+
+
+
+
+-- Step 1: Get the total sum in a CTE
+WITH total_amount_cte AS (
+    SELECT SUM(amount) AS total_amount
+    FROM transactions
+)
+
+-- Step 2: Use that total in your main query
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / total_amount_cte.total_amount, 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id,
+     total_amount_cte  -- Reference the total in the FROM clause
+GROUP BY cc.card_name, total_amount_cte.total_amount;
+
+
+
+
+
+-- Set a variable with the total amount
+SET @total_amount = (SELECT SUM(amount) FROM transactions);
+
+-- Then run the main query using that variable
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / @total_amount, 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+
+
+
+
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(
+            100.0 * SUM(t.amount) / (
+                SELECT SUM(amount)
+                FROM transactions
+            ), 
+            2
+        ),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+
+
+-- Step 1: Create a total row
+SELECT 
+    NULL AS card_name,
+    SUM(amount) AS total_amount,
+    NULL AS percentage_of_total
+FROM transactions
+
+UNION ALL
+
+-- Step 2: Get breakdown by card and calculate percentage using scalar subquery
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / (
+            SELECT SUM(amount) FROM transactions
+        ), 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+
+-- Part 1: Total row labeled as 'TOTAL'
+SELECT 
+    'TOTAL' AS card_name,
+    SUM(amount) AS all_Sum_byMonth_Repeated,
+    NULL AS percentage_of_total
+FROM transactions
+
+UNION ALL
+
+-- Part 2: Per-card sums and percentage
+SELECT 
+    cc.card_name,
+    SUM(t.amount) AS all_Sum_byMonth_Repeated,
+    CONCAT(
+        ROUND(100.0 * SUM(t.amount) / (
+            SELECT SUM(amount) FROM transactions
+        ), 2),
+        '%'
+    ) AS percentage_of_total
+FROM transactions t
+LEFT JOIN credit_cards cc ON t.credit_card_id = cc.id
+GROUP BY cc.card_name;
+
+
+
+
+
+
 
 -- Summing the total amount by credit card name, grouped by month and repeated transactions by this mouth 
 SELECT cc.card_name, SUM(t.amount) AS all_Sum_byMonth_Repeated
@@ -1384,20 +1566,20 @@ WHERE id = 4;
 
 -- Backup the 'finances' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
-"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_12052025_New.sql" finances
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_28052025_New.sql" finances
 
 
 
 
 -- Create a new database for homologation (testing purposes)
-"C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres -h localhost -p 5432 finances_Dev
+"C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres -h localhost -p 5432 finances_BI
 
 
 
 
 -- Restore the backup into the 'finances_Homolog' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
-"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_Dev < "C:\PostgreSQL\finances_12052025_New.sql"
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_BI < "C:\PostgreSQL\finances_28052025_New.sql"
 
 
 

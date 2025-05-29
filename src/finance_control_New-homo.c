@@ -2809,6 +2809,162 @@ POSTGRESQL:
 
 
 
+
+
+
+            -- Account Balance History Table
+            CREATE TABLE IF NOT EXISTS public.account_balance_history (
+                id SERIAL PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES public.account(id) ON DELETE CASCADE,
+                old_balance NUMERIC(10,2),
+                new_balance NUMERIC(10,2),
+                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                changed_by TEXT DEFAULT current_user, -- Optional: application can override
+                note TEXT -- Optional: can store additional context
+            );
+
+            -- Trigger Function
+            CREATE OR REPLACE FUNCTION public.log_account_balance_change()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                -- Only log when balance actually changes
+                IF NEW.balance IS DISTINCT FROM OLD.balance THEN
+                    INSERT INTO public.account_balance_history (
+                        account_id,
+                        old_balance,
+                        new_balance,
+                        changed_at,
+                        changed_by,
+                        note
+                    ) VALUES (
+                        OLD.id,               -- account_id from OLD row
+                        OLD.balance,
+                        NEW.balance,
+                        CURRENT_TIMESTAMP,
+                        current_user,         -- or override via session var
+                        NULL                  -- Optional: can pass a note from app if needed
+                    );
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            -- Trigger
+            DROP TRIGGER IF EXISTS trg_log_account_balance_change ON public.account;
+
+            CREATE TRIGGER trg_log_account_balance_change
+            AFTER UPDATE OF balance ON public.account
+            FOR EACH ROW
+            WHEN (OLD.balance IS DISTINCT FROM NEW.balance)
+            EXECUTE FUNCTION public.log_account_balance_change();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        -- Create the Audit Table  credit_cards_audit
+
+        CREATE TABLE IF NOT EXISTS public.credit_cards_audit (
+            audit_id serial PRIMARY KEY,
+            credit_card_id integer NOT NULL,
+            card_name character varying(100) NOT NULL,
+            credit_limit numeric(10,2) NOT NULL,
+            closes_on_day integer NOT NULL,
+            due_day integer NOT NULL,
+            operation_type varchar(10) NOT NULL,  -- 'INSERT', 'UPDATE', 'DELETE'
+            operation_timestamp timestamp DEFAULT now(),
+            changed_by text DEFAULT current_user  -- optional: track who made the change
+        );
+
+
+
+        CREATE OR REPLACE FUNCTION log_credit_card_changes()
+        RETURNS trigger AS $$
+        BEGIN
+            IF TG_OP = 'INSERT' THEN
+                INSERT INTO credit_cards_audit (
+                    credit_card_id, card_name, credit_limit, closes_on_day, due_day,
+                    operation_type
+                ) VALUES (
+                    NEW.id, NEW.card_name, NEW.credit_limit, NEW.closes_on_day, NEW.due_day,
+                    'INSERT'
+                );
+                RETURN NEW;
+
+            ELSIF TG_OP = 'UPDATE' THEN
+                INSERT INTO credit_cards_audit (
+                    credit_card_id, card_name, credit_limit, closes_on_day, due_day,
+                    operation_type
+                ) VALUES (
+                    NEW.id, NEW.card_name, NEW.credit_limit, NEW.closes_on_day, NEW.due_day,
+                    'UPDATE'
+                );
+                RETURN NEW;
+
+            ELSIF TG_OP = 'DELETE' THEN
+                INSERT INTO credit_cards_audit (
+                    credit_card_id, card_name, credit_limit, closes_on_day, due_day,
+                    operation_type
+                ) VALUES (
+                    OLD.id, OLD.card_name, OLD.credit_limit, OLD.closes_on_day, OLD.due_day,
+                    'DELETE'
+                );
+                RETURN OLD;
+            END IF;
+            RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+
+
+
+
+
+        CREATE TRIGGER credit_cards_audit_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON credit_cards
+        FOR EACH ROW
+        EXECUTE FUNCTION log_credit_card_changes();
+
+
+
+
+
+
+
+
+
+
+        -- CREATE VIEW: 
+
+        CREATE OR REPLACE VIEW monthly_tithe_summary AS
+        SELECT 
+            ROUND(SUM(amount), 2) AS total_income,
+            ROUND(SUM(amount) * 0.10, 2) AS tithe_amount
+        FROM 
+            public.income
+        WHERE 
+            DATE_TRUNC('month', date) = DATE_TRUNC('month', CURRENT_DATE);
+
+
+
+
+
+
+
+
+
+
+
+
+
             -- psql -d database -U user
 
             -- psql -d shutdown_logs -U postgres
