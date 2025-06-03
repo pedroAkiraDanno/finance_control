@@ -2011,6 +2011,7 @@ void viewBudgetLimits(PGconn *conn, int user_id) {
              "    FROM transactions t "
              "    WHERE t.user_id = budget.user_id "
              "    AND t.type = 'expense' "
+             "    AND t.title NOT ILIKE 'Invoice Payment'  "
              "    AND CASE "
              "        WHEN budget.period = 'monthly' THEN "
              "            EXTRACT(MONTH FROM t.purchase_date) = EXTRACT(MONTH FROM CURRENT_DATE) "
