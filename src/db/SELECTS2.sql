@@ -1557,6 +1557,39 @@ WHERE id = 4;
 
 
 
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+SELECT * FROM account
+3
+
+
+SELECT ac.title_account, purchase_date ,*	
+FROM public.transactions tr
+INNER JOIN account ac ON tr.account_id = ac.id
+WHERE tr.account_id = 3
+AND tr.title not ilike '%invoice%'
+order by 2
+AND purchase_date = 
+
+
+
+
+SELECT ac.title_account, purchase_date ,*	
+FROM public.transactions tr
+INNER JOIN account ac ON tr.account_id = ac.id
+WHERE tr.account_id = 1
+AND tr.title not ilike '%invoice%'
+AND tr.purchase_date between '2025-05-07' and '2025-05-23'
+order by 2
+
+
+
+
+
 
 -- -------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1566,7 +1599,7 @@ WHERE id = 4;
 
 -- Backup the 'finances' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
-"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_28052025_New.sql" finances
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_02062025_New.sql" finances
 
 
 
@@ -1579,7 +1612,7 @@ WHERE id = 4;
 
 -- Restore the backup into the 'finances_Homolog' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
-"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_BI < "C:\PostgreSQL\finances_28052025_New.sql"
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_BI < "C:\PostgreSQL\finances_02062025_New.sql"
 
 
 

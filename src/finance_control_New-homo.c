@@ -2867,6 +2867,8 @@ POSTGRESQL:
         INSERT INTO categories (name) VALUES
         ('Donate');
 
+        INSERT INTO categories (name) values ('Electronics');
+
 
 
 
