@@ -13,6 +13,9 @@
 
 
 
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +64,9 @@ void viewAccountTypes(PGconn *conn);
 void addDebitCard(PGconn *conn, int user_id);
 void viewDebitCards(PGconn *conn, int user_id);
 void updateDebitCard(PGconn *conn, int user_id);
+void addBudgetLimit(PGconn *conn, int user_id);
+void viewBudgetLimits(PGconn *conn, int user_id);
+
 
 
 
@@ -130,7 +136,9 @@ void printMenu() {
     printf("25. Add Debit Card\n");  // New option
     printf("26. View Debit Cards\n"); // New option    
     printf("27. Update Debit Card\n");  // New option  
-    printf("28. Exit\n");
+    printf("28. Add Budget Limit\n");  // Changed from "Add Spending Limit"
+    printf("29. View Budget Limits\n"); // Changed from "View Spending Limits"    
+    printf("30. Exit\n");
 }
 
 
@@ -1945,6 +1953,137 @@ void updateDebitCard(PGconn *conn, int user_id) {
 
 
 
+
+
+
+// Function to add a new budget limit
+void addBudgetLimit(PGconn *conn, int user_id) {
+    float amount;
+    char period[20];
+    char notes[256] = "";
+    
+    printf("Enter budget amount: ");
+    scanf("%f", &amount);
+    
+    printf("Enter period (monthly/quarterly/yearly): ");
+    scanf(" %[^\n]", period);
+    
+    // Validate period
+    if (strcmp(period, "monthly") != 0 && 
+        strcmp(period, "quarterly") != 0 && 
+        strcmp(period, "yearly") != 0) {
+        printf("Invalid period. Must be 'monthly', 'quarterly' or 'yearly'.\n");
+        return;
+    }
+    
+    printf("Enter optional notes (press Enter to skip): ");
+    getchar(); // Clear newline from previous input
+    fgets(notes, sizeof(notes), stdin);
+    notes[strcspn(notes, "\n")] = '\0'; // Remove trailing newline
+    
+    char query[512];
+    snprintf(query, sizeof(query), 
+             "INSERT INTO budget (user_id, period, amount, current_value, is_enabled, notes) "
+             "VALUES (%d, '%s', %.2f, 0.00, TRUE, '%s')", 
+             user_id, period, amount, notes[0] != '\0' ? notes : "");
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add budget limit: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Budget limit added successfully!\n");
+}
+
+
+
+
+// Function to view budget limits with current spending
+void viewBudgetLimits(PGconn *conn, int user_id) {
+    char query[1024];
+    
+    // First, update all current_values based on actual spending
+    snprintf(query, sizeof(query),
+             "UPDATE budget "
+             "SET current_value = ("
+             "    SELECT COALESCE(SUM(t.amount), 0) "
+             "    FROM transactions t "
+             "    WHERE t.user_id = budget.user_id "
+             "    AND t.type = 'expense' "
+             "    AND CASE "
+             "        WHEN budget.period = 'monthly' THEN "
+             "            EXTRACT(MONTH FROM t.purchase_date) = EXTRACT(MONTH FROM CURRENT_DATE) "
+             "            AND EXTRACT(YEAR FROM t.purchase_date) = EXTRACT(YEAR FROM CURRENT_DATE) "
+             "        WHEN budget.period = 'quarterly' THEN "
+             "            EXTRACT(QUARTER FROM t.purchase_date) = EXTRACT(QUARTER FROM CURRENT_DATE) "
+             "            AND EXTRACT(YEAR FROM t.purchase_date) = EXTRACT(YEAR FROM CURRENT_DATE) "
+             "        WHEN budget.period = 'yearly' THEN "
+             "            EXTRACT(YEAR FROM t.purchase_date) = EXTRACT(YEAR FROM CURRENT_DATE) "
+             "    END"
+             ") "
+             "WHERE user_id = %d", user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to update budget limits: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    
+    // Now select the budget limits with current spending
+    snprintf(query, sizeof(query),
+             "SELECT id, period, amount, current_value, "
+             "date, is_enabled, notes, "
+             "CASE WHEN current_value >= amount THEN 'OVER BUDGET' "
+             "     WHEN current_value >= amount * 0.9 THEN 'NEAR LIMIT' "
+             "     ELSE 'UNDER BUDGET' END AS status, "
+             "amount - current_value AS remaining "
+             "FROM budget "
+             "WHERE user_id = %d "
+             "ORDER BY period, date DESC", user_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No budget limits found.\n");
+    } else {
+        printf("ID | Period     | Budget Amount | Current Spending | Remaining | Status      | Enabled | Date       | Notes\n");
+        printf("------------------------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%s | %-9s | %-13s | %-16s | %-9s | %-11s | %-7s | %-9s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Period
+                   PQgetvalue(res, i, 2),  // Amount
+                   PQgetvalue(res, i, 3),  // Current Value
+                   PQgetvalue(res, i, 8),  // Remaining
+                   PQgetvalue(res, i, 7),  // Status
+                   PQgetvalue(res, i, 5),  // Is Enabled
+                   PQgetvalue(res, i, 4),  // Date
+                   PQgetvalue(res, i, 6)); // Notes
+        }
+    }
+    PQclear(res);
+}
+
+
+
+
+
+
+
+
+
+
+
 int main() {
     const char *conninfo = "dbname=finances_Homolog user=postgres password=p0w2i8 hostaddr=127.0.0.1 port=5432";
     PGconn *conn = PQconnectdb(conninfo);
@@ -2323,7 +2462,13 @@ int main() {
             case 27: // Update Debit Card
                 updateDebitCard(conn, user_id);
                 break;                
-            case 28: // Exit
+            case 28: // Add Budget Limit
+                addBudgetLimit(conn, user_id);
+                break;
+            case 29: // View Budget Limits
+                viewBudgetLimits(conn, user_id);
+                break;                
+            case 30: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
@@ -2804,6 +2949,12 @@ POSTGRESQL:
 
 
 
+        -- Insert new category
+        INSERT INTO categories (name) VALUES
+        ('Donate');
+
+        INSERT INTO categories (name) values ('Electronics');        
+
 
 
 
@@ -2861,13 +3012,6 @@ POSTGRESQL:
 
 
 
-
-
-        -- Insert new category
-        INSERT INTO categories (name) VALUES
-        ('Donate');
-
-        INSERT INTO categories (name) values ('Electronics');
 
 
 
@@ -2966,6 +3110,27 @@ POSTGRESQL:
 
 
 
+        CREATE TABLE budget (
+            id SERIAL PRIMARY KEY,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            period VARCHAR(20) CHECK (period IN ('monthly', 'quarterly', 'yearly')) NOT NULL DEFAULT 'monthly',
+            amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
+            current_value NUMERIC(10, 2),
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            date DATE NOT NULL DEFAULT CURRENT_DATE,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2997,7 +3162,7 @@ POSTGRESQL:
 
 WINDOWS:
 
-    gcc -o finance_control_New finance_control_New.c -I "C:\Program Files\PostgreSQL\<version>\include" -L "C:\Program Files\PostgreSQL\<version>\lib" -lpq
+    --gcc -o finance_control_New finance_control_New.c -I "C:\Program Files\PostgreSQL\<version>\include" -L "C:\Program Files\PostgreSQL\<version>\lib" -lpq
 
     gcc -o finance_control_New-homo finance_control_New-homo.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
 
@@ -3044,6 +3209,14 @@ LINUX preparation:
 
 
 */
+
+
+
+
+
+
+
+
 
 
 
