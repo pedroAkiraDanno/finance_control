@@ -3124,6 +3124,44 @@ POSTGRESQL:
         );
 
 
+        INSERT INTO subcategories (name, category_id) VALUES ('Phone', 2);
+        INSERT INTO categories (name) VALUES ('Bets');
+        INSERT INTO subcategories (name,category_id) VALUES ('Shoes',4);
+
+
+
+
+        INSERT INTO subcategories (name,category_id) values ('Toll',21);
+
+
+
+
+
+
+
+
+
+        CREATE OR REPLACE FUNCTION get_tithe_summary(start_date DATE, end_date DATE)
+        RETURNS TABLE (
+            total_income NUMERIC,
+            tithe_amount NUMERIC
+        ) AS $$
+        BEGIN
+            RETURN QUERY
+            SELECT 
+                ROUND(SUM(amount), 2) AS total_income,
+                ROUND(SUM(amount) * 0.10, 2) AS tithe_amount
+            FROM 
+                public.income
+            WHERE 
+                date BETWEEN start_date AND end_date;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+
+        -- use: SELECT * FROM get_tithe_summary('2025-06-01', '2025-06-29');
+
+
 
 
 

@@ -1599,7 +1599,7 @@ order by 2
 
 -- Backup the 'finances' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F c -b -v -f "C:\PostgreSQL\finances_22042025New.backup" finances;
-"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_03062025_New.sql" finances
+"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -p 5432 -F p -b -v -f "C:\PostgreSQL\finances_24062025_New.sql" finances
 
 
 
@@ -1612,12 +1612,13 @@ order by 2
 
 -- Restore the backup into the 'finances_Homolog' database
 --"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h localhost -p 5432 -d finances_Homolog -v "C:\PostgreSQL\finances_22042025New.backup";
-"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_BI < "C:\PostgreSQL\finances_03062025_New.sql"
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5432 -d finances_BI < "C:\PostgreSQL\finances_24062025_New.sql"
 
 
 
 
-
+-- AZURE service POSTGRESQL
+-- "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgresadm -h srvpostgresql23062025.postgres.database.azure.com -p 5432 -d finances_Dev < "C:\PostgreSQL\finances_21062025_New.sql"
 
 
 
