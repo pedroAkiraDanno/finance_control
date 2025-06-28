@@ -3,19 +3,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,7 +82,7 @@ void displayIntroduction() {
     printf(" |  _| | | | | | | | (_| | | | | | | (__  | | | (_| | | |   | (__  | (_) | | | | | | |_  | |    | (_) | | |\n");
     printf(" |_|   |_| |_| |_|  \\__,_| |_| |_|  \\___| |_|  \\__,_| |_|    \\___|  \\___/  |_| |_|  \\__| |_|     \\___/  |_|\n");
     printf("\n\n");
-    printf("Financial Control, Homo version\n");
+    printf("Financial Control, Homolog version\n");
     printf("Created by Pedro Akira, with C and PostgreSQL\n");
     printf("\n\n");
     printf("Press Enter to continue...");
@@ -2012,7 +1999,7 @@ void viewBudgetLimits(PGconn *conn, int user_id) {
              "    FROM transactions t "
              "    WHERE t.user_id = budget.user_id "
              "    AND t.type = 'expense' "
-             "    AND t.title NOT ILIKE 'Invoice Payment'  "             
+             "    AND t.title NOT ILIKE 'Invoice Payment'  "
              "    AND CASE "
              "        WHEN budget.period = 'monthly' THEN "
              "            EXTRACT(MONTH FROM t.purchase_date) = EXTRACT(MONTH FROM CURRENT_DATE) "
@@ -3125,6 +3112,44 @@ POSTGRESQL:
         );
 
 
+        INSERT INTO subcategories (name, category_id) VALUES ('Phone', 2);
+        INSERT INTO categories (name) VALUES ('Bets');
+        INSERT INTO subcategories (name,category_id) VALUES ('Shoes',4);
+
+
+
+
+        INSERT INTO subcategories (name,category_id) values ('Toll',21);
+
+
+
+
+
+
+
+
+
+        CREATE OR REPLACE FUNCTION get_tithe_summary(start_date DATE, end_date DATE)
+        RETURNS TABLE (
+            total_income NUMERIC,
+            tithe_amount NUMERIC
+        ) AS $$
+        BEGIN
+            RETURN QUERY
+            SELECT 
+                ROUND(SUM(amount), 2) AS total_income,
+                ROUND(SUM(amount) * 0.10, 2) AS tithe_amount
+            FROM 
+                public.income
+            WHERE 
+                date BETWEEN start_date AND end_date;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+
+        -- use: SELECT * FROM get_tithe_summary('2025-06-01', '2025-06-29');
+
+
 
 
 
@@ -3165,7 +3190,7 @@ WINDOWS:
 
     --gcc -o finance_control_New finance_control_New.c -I "C:\Program Files\PostgreSQL\<version>\include" -L "C:\Program Files\PostgreSQL\<version>\lib" -lpq
 
-    gcc -o finance_control_New-homo finance_control_New-homo.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
+    gcc -o finance_control_New-dev finance_control_New-dev.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
 
 
 
@@ -3210,181 +3235,6 @@ LINUX preparation:
 
 
 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
