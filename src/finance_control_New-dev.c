@@ -3164,6 +3164,19 @@ POSTGRESQL:
 
 
 
+    -- INVESTIMENT 
+
+
+        -- Table: I_stonks_Current
+        -- Purpose: Stores the latest known values of various investment instruments (e.g., stocks)
+
+        CREATE TABLE I_stonks_Current (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            code VARCHAR(10) UNIQUE NOT NULL,
+            current_value NUMERIC(10, 2)
+        );
+
 
 
 
