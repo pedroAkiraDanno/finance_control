@@ -17,10 +17,10 @@ cur = conn.cursor()
 
 # Create the table if it doesn't exist
 cur.execute("""
-  CREATE TABLE IF NOT EXISTS crypto_coins (
+  CREATE TABLE IF NOT EXISTS investment.crypto_coins (
     coin_id SERIAL PRIMARY KEY,
-    symbol VARCHAR(10) UNIQUE NOT NULL,
-    name VARCHAR(50) UNIQUE NOT NULL,
+    symbol VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
@@ -56,7 +56,7 @@ while True:
             name = coin['name'].encode('utf-8', 'ignore').decode('utf-8')[:50]  # Clean and trim
             desc = f"{name} ({symbol}), market cap rank #{coin.get('market_cap_rank', '?')}"
             cur.execute("""
-              INSERT INTO crypto_coins (symbol, name, description)
+              INSERT INTO investment.crypto_coins (symbol, name, description)
               VALUES (%s, %s, %s)
               ON CONFLICT (symbol) DO NOTHING;
             """, (symbol, name, desc))
@@ -72,7 +72,7 @@ while True:
 print(f"✅ Finished. Total coins inserted: {total_inserted}")
 
 # Confirm total entries
-cur.execute("SELECT COUNT(*) FROM crypto_coins;")
+cur.execute("SELECT COUNT(*) FROM investment.crypto_coins;")
 print("Total coins in database:", cur.fetchone()[0])
 
 # Clean up

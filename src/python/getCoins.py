@@ -1,3 +1,12 @@
+
+
+
+
+
+
+
+
+
 import psycopg2
 from pycoingecko import CoinGeckoAPI
 
@@ -7,10 +16,10 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 cur.execute("""
-  CREATE TABLE IF NOT EXISTS crypto_coins (
+  CREATE TABLE IF NOT EXISTS investment.crypto_coins (
     coin_id SERIAL PRIMARY KEY,
-    symbol VARCHAR(10) UNIQUE NOT NULL,
-    name VARCHAR(50) UNIQUE NOT NULL,
+    symbol VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
@@ -27,19 +36,26 @@ for coin in data:
     name = coin['name']
     desc = f"{name} ({symbol}), market cap rank #{coin.get('market_cap_rank', '?')}"
     cur.execute("""
-      INSERT INTO crypto_coins (symbol, name, description)
+      INSERT INTO investment.crypto_coins (symbol, name, description)
       VALUES (%s, %s, %s)
       ON CONFLICT (symbol) DO NOTHING;
     """, (symbol, name, desc))
 conn.commit()
 
 # 4. Confirm entries
-cur.execute("SELECT coin_id, symbol, name, created_at FROM crypto_coins;")
+cur.execute("SELECT coin_id, symbol, name, created_at FROM investment.crypto_coins;")
 for row in cur.fetchall():
     print(row)
 
 cur.close()
 conn.close()
+
+
+
+
+
+
+
 
 
 
