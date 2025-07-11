@@ -74,6 +74,7 @@ void sellCrypto(PGconn *conn, int user_id);
 void viewCryptoTransactions(PGconn *conn, int user_id);
 double get_usd_brl_rate(PGconn *conn);
 void updateCoinPrices(int coin_id);
+void update_usd_brl_rate();
 
 
 
@@ -2143,7 +2144,7 @@ void addCryptoCoin(PGconn *conn) {
 }
 
 
-
+/*
 double get_usd_brl_rate(PGconn *conn) {
     PGresult *res = PQexec(conn,
         "SELECT rate FROM exchange_rates WHERE currency_pair = 'USD/BRL' "
@@ -2159,7 +2160,29 @@ double get_usd_brl_rate(PGconn *conn) {
     PQclear(res);
     return rate;
 }
+*/
 
+double get_usd_brl_rate(PGconn *conn) {
+    const char *query = "SELECT rate FROM exchange_rates WHERE currency_pair = 'USD/BRL' "
+                       "ORDER BY last_updated DESC LIMIT 1";
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Failed to fetch exchange rate: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 5.0; // Default fallback rate if error occurs
+    }
+
+    double rate = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    
+    if (rate <= 0) {
+        fprintf(stderr, "Invalid exchange rate: %.4f\n", rate);
+        return 5.0; // Default fallback rate if invalid
+    }
+    
+    return rate;
+}
 
 
 
@@ -2222,6 +2245,26 @@ void updateCoinPrices(int coin_id) {
 
 
 
+// Function to update coin prices using Python script
+void update_usd_brl_rate() {
+    char command[512];  // Allocate enough space for the full command
+
+    #ifdef _WIN32
+        // Format the command with the coin_id
+        snprintf(command, sizeof(command),
+            "python C:\\Users\\Akira\\Documents\\GitHub\\finance_control\\src\\python\\update_currency_rates.py >nul 2> update_currency_ratesErrors.log");
+    #else
+        snprintf(command, sizeof(command),
+            "python3 /path/to/update_currency_rates.py  >/dev/null 2> update_currency_ratesErrors.log" );
+    #endif
+
+    // Execute the command
+    system(command);
+}
+
+
+
+
 void buyCrypto(PGconn *conn, int user_id) {
     int coin_id, account_id, buy_option;
     double quantity = 0, amount = 0, amount_brl = 0, price_per_coin = 0, price_per_coin_brl = 0;
@@ -2230,6 +2273,8 @@ void buyCrypto(PGconn *conn, int user_id) {
     char currency[4] = "BRL"; // Default to BRL
     int use_current_price = 0;
     int auto_fetch_price = 0;
+
+    update_usd_brl_rate(); // update update_usd_brl_rate by python    
 
     // Show available coins
     const char *coin_query = "SELECT coin_id, symbol, name FROM investment.crypto_coins ORDER BY symbol";
@@ -2251,11 +2296,19 @@ void buyCrypto(PGconn *conn, int user_id) {
     }
 
     printf("\nEnter coin ID to buy: ");
-    scanf("%d", &coin_id);
+    if (scanf("%d", &coin_id) != 1 || coin_id <= 0) {
+        printf("Invalid coin ID.\n");
+        PQclear(coin_res);
+        return;
+    }
 
     viewAccounts(conn, user_id);
     printf("Enter account ID to use: ");
-    scanf("%d", &account_id);
+    if (scanf("%d", &account_id) != 1 || account_id <= 0) {
+        printf("Invalid account ID.\n");
+        PQclear(coin_res);
+        return;
+    }
 
     printf("\nSelect buy option:\n");
     printf("1. Enter all details manually in BRL (quantity, price, amount)\n");
@@ -2265,78 +2318,194 @@ void buyCrypto(PGconn *conn, int user_id) {
     printf("5. Enter amount in BRL and calculate quantity (automatic price)\n");
     printf("6. Enter amount in USD and calculate quantity (automatic price)\n");
     printf("7. Use current market price with specific quantity\n");
-    printf("Enter brokerage fee (if any): ");
-    scanf("%f", &brokerage_fee);
     printf("Enter your choice: ");
-    scanf("%d", &buy_option);
+    if (scanf("%d", &buy_option) != 1 || buy_option < 1 || buy_option > 7) {
+        printf("Invalid choice.\n");
+        PQclear(coin_res);
+        return;
+    }
+    printf("Enter brokerage fee (if any): ");
+    if (scanf("%f", &brokerage_fee) != 1 || brokerage_fee < 0) {
+        printf("Invalid brokerage fee.\n");
+        PQclear(coin_res);
+        return;
+    }
 
     switch (buy_option) {
-        case 1: // Manual entry in BRL
+        case 1: { // Manual entry in BRL
             printf("Enter quantity to buy: ");
-            scanf("%lf", &quantity);
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
             printf("Enter price per coin in BRL: ");
-            scanf("%lf", &price_per_coin_brl);
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
             amount_brl = quantity * price_per_coin_brl;
-            // Convert to USD
-            price_per_coin = price_per_coin_brl / get_usd_brl_rate(conn);
+
+            update_usd_brl_rate(); // update update_usd_brl_rate by python
+            
+            // Convert to USD with proper exchange rate handling
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual USD price entry.\n", exchange_rate);
+                printf("Enter price per coin in USD: ");
+                if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin = price_per_coin_brl / exchange_rate;
+            }
             amount = quantity * price_per_coin;
             strcpy(currency, "BRL");
             break;
+        }
             
-        case 2: // Manual entry in USD
+        case 2: { // Manual entry in USD
             printf("Enter quantity to buy: ");
-            scanf("%lf", &quantity);
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
             printf("Enter price per coin in USD: ");
-            scanf("%lf", &price_per_coin);
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
             amount = quantity * price_per_coin;
+
+            update_usd_brl_rate(); // update update_usd_brl_rate by python
             // Convert to BRL
-            price_per_coin_brl = price_per_coin * get_usd_brl_rate(conn);
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual BRL price entry.\n", exchange_rate);
+                printf("Enter price per coin in BRL: ");
+                if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin_brl = price_per_coin * exchange_rate;
+            }
             amount_brl = quantity * price_per_coin_brl;
             strcpy(currency, "USD");
             break;
+        }
             
-        case 3: // BRL amount with manual price
+        case 3: { // BRL amount with manual price
             printf("Enter amount in BRL to spend: ");
-            scanf("%lf", &amount_brl);
+            if (scanf("%lf", &amount_brl) != 1 || amount_brl <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
             printf("Enter price per coin in BRL: ");
-            scanf("%lf", &price_per_coin_brl);
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
             quantity = amount_brl / price_per_coin_brl;
-            price_per_coin = price_per_coin_brl / get_usd_brl_rate(conn);
+            // Convert to USD
+            update_usd_brl_rate(); // update update_usd_brl_rate by python            
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual USD price entry.\n", exchange_rate);
+                printf("Enter price per coin in USD: ");
+                if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin = price_per_coin_brl / exchange_rate;
+            }
             amount = quantity * price_per_coin;
             strcpy(currency, "BRL");
             break;
+        }
             
-        case 4: // USD amount with manual price
+        case 4: { // USD amount with manual price
             printf("Enter amount in USD to spend: ");
-            scanf("%lf", &amount);
+            if (scanf("%lf", &amount) != 1 || amount <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
             printf("Enter price per coin in USD: ");
-            scanf("%lf", &price_per_coin);
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
             quantity = amount / price_per_coin;
-            price_per_coin_brl = price_per_coin * get_usd_brl_rate(conn);
+            // Convert to BRL
+            update_usd_brl_rate(); // update update_usd_brl_rate by python            
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual BRL price entry.\n", exchange_rate);
+                printf("Enter price per coin in BRL: ");
+                if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin_brl = price_per_coin * exchange_rate;
+            }
             amount_brl = quantity * price_per_coin_brl;
             strcpy(currency, "USD");
             break;
+        }
             
-        case 5: // BRL amount with automatic price
+        case 5: { // BRL amount with automatic price
             printf("Enter amount in BRL to spend: ");
-            scanf("%lf", &amount_brl);
+            if (scanf("%lf", &amount_brl) != 1 || amount_brl <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
             strcpy(currency, "BRL");
             auto_fetch_price = 1;
             break;
+        }
             
-        case 6: // USD amount with automatic price
+        case 6: { // USD amount with automatic price
             printf("Enter amount in USD to spend: ");
-            scanf("%lf", &amount);
+            if (scanf("%lf", &amount) != 1 || amount <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
             auto_fetch_price = 1;
             break;
+        }
             
-        case 7: // Current market price
+        case 7: { // Current market price
             use_current_price = 1;
             printf("Select currency (USD/BRL): ");
-            scanf("%3s", currency);
+            if (scanf("%3s", currency) != 1 || 
+                (strcmp(currency, "USD") != 0 && strcmp(currency, "BRL") != 0)) {
+                printf("Invalid currency. Using BRL.\n");
+                strcpy(currency, "BRL");
+            }
             printf("Enter quantity to buy: ");
-            scanf("%lf", &quantity);
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
             break;
+        }
             
         default:
             printf("Invalid option.\n");
@@ -2347,19 +2516,30 @@ void buyCrypto(PGconn *conn, int user_id) {
     // Fetch current price if needed
     if (auto_fetch_price || use_current_price) {
         updateCoinPrices(coin_id); // Update prices from external source
+        update_usd_brl_rate(); // Update update_usd_brl_rate
         price_per_coin = getCurrentCoinPrice(conn, coin_id, "USD");
         price_per_coin_brl = getCurrentCoinPrice(conn, coin_id, "BRL");
         
-        if (price_per_coin < 0 || price_per_coin_brl < 0) {
+        if (price_per_coin <= 0 || price_per_coin_brl <= 0) {
             printf("Failed to get current price. Using manual entry instead.\n");
             printf("Enter price per coin in USD: ");
-            scanf("%lf", &price_per_coin);
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
             printf("Enter price per coin in BRL: ");
-            scanf("%lf", &price_per_coin_brl);
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
         } else {
             printf("Current price: %.8f USD | %.8f BRL\n", price_per_coin, price_per_coin_brl);
         }
-        
+
+        update_usd_brl_rate(); // update update_usd_brl_rate by python
+
         if (auto_fetch_price) {
             if (strcmp(currency, "BRL") == 0) {
                 quantity = amount_brl / price_per_coin_brl;
@@ -2379,6 +2559,15 @@ void buyCrypto(PGconn *conn, int user_id) {
         }
     }
 
+    // Verify the calculated values are valid
+    if (quantity <= 0 || amount <= 0 || amount_brl <= 0 || 
+        price_per_coin <= 0 || price_per_coin_brl <= 0 ||
+        !isfinite(price_per_coin) || !isfinite(price_per_coin_brl)) {
+        printf("Error: Invalid calculated values. Transaction canceled.\n");
+        PQclear(coin_res);
+        return;
+    }
+
     printf("\nTransaction Summary:\n");
     printf("Coin ID: %d\n", coin_id);
     printf("Quantity: %.8f\n", quantity);
@@ -2395,7 +2584,11 @@ void buyCrypto(PGconn *conn, int user_id) {
     // Confirm transaction
     printf("\nConfirm this transaction? (1 for Yes, 0 for No): ");
     int confirm;
-    scanf("%d", &confirm);
+    if (scanf("%d", &confirm) != 1) {
+        printf("Invalid input. Transaction canceled.\n");
+        PQclear(coin_res);
+        return;
+    }
     if (!confirm) {
         printf("Transaction canceled.\n");
         PQclear(coin_res);
@@ -2489,6 +2682,14 @@ void buyCrypto(PGconn *conn, int user_id) {
            quantity, amount_brl, amount);
     printf("Including brokerage fee of %.2f\n", brokerage_fee);
 }
+
+
+
+
+
+
+
+
 
 
 void sellCrypto(PGconn *conn, int user_id) {

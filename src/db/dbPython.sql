@@ -12,14 +12,14 @@ where table_schema = 'investment' and table_type = 'BASE TABLE'
 order by tables;
 
 
-SELECT * FROM investment."coin_details"
-SELECT * FROM investment."coin_prices"
-SELECT * FROM investment."coin_types"
-SELECT * FROM investment."crypto_coin_types"
-SELECT * FROM investment."crypto_coins"
-SELECT * FROM investment."crypto_transactions"
-SELECT * FROM investment."crypto_wallets"
-SELECT * FROM investment."wallet_snapshots"
+SELECT * FROM investment."coin_details";
+SELECT * FROM investment."coin_prices";
+SELECT * FROM investment."coin_types";
+SELECT * FROM investment."crypto_coin_types";
+SELECT * FROM investment."crypto_coins";
+SELECT * FROM investment."crypto_transactions";
+SELECT * FROM investment."crypto_wallets";
+SELECT * FROM investment."wallet_snapshots";
 
 
 
