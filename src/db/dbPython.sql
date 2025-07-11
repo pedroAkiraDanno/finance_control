@@ -6,6 +6,22 @@
 
 
 
+-- Retrieve information about all tables in the 'public' schema
+select * from information_schema.tables 
+where table_schema = 'investment' and table_type = 'BASE TABLE' 
+order by tables;
+
+
+SELECT * FROM investment."coin_details"
+SELECT * FROM investment."coin_prices"
+SELECT * FROM investment."coin_types"
+SELECT * FROM investment."crypto_coin_types"
+SELECT * FROM investment."crypto_coins"
+SELECT * FROM investment."crypto_transactions"
+SELECT * FROM investment."crypto_wallets"
+SELECT * FROM investment."wallet_snapshots"
+
+
 
 
 
@@ -124,16 +140,26 @@ CREATE TABLE IF NOT EXISTS investment.crypto_transactions (
     coin_id INT REFERENCES investment.crypto_coins(coin_id) ON DELETE CASCADE,
     tx_type VARCHAR(10) CHECK (tx_type IN ('BUY', 'SELL', 'TRANSFER')),
     quantity DECIMAL(30, 10) NOT NULL CHECK (quantity > 0),
-    amount DECIMAL(10, 2) NOT NULL,    -- new coluam if needed put manual value
-    price_per_coin DECIMAL(18, 8) NOT NULL,
+    amount DECIMAL(10, 2),    -- new coluam if needed put manual value
+    amount_brl DECIMAL(10, 2),    -- new coluam if needed put manual value    
+    brokerage_fee DECIMAL(10, 2),
+    price_per_coin DECIMAL(18, 8),
+    price_per_coin_brl DECIMAL(18, 8),    
     total_value DECIMAL(30, 2) GENERATED ALWAYS AS (quantity * price_per_coin) STORED,
+    total_value_brl DECIMAL(30, 2) GENERATED ALWAYS AS (quantity * price_per_coin_brl) STORED,    
     tx_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     notes TEXT
 );
 
 -- 7. Alter existing transactions table (if you have it) to add account_id
+-- ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id INT REFERENCES account(id) ON DELETE SET NULL;
+
 ALTER TABLE transactions
-ADD COLUMN IF NOT EXISTS account_id INT REFERENCES account(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS amount_brl DECIMAL(18, 2);
+
+
+
+
 
 
 

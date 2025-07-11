@@ -1,5 +1,5 @@
 Traceback (most recent call last):
-  File "C:\Users\Akira\Documents\GitHub\finance_control\src\python\GetPriceCoins.py", line 70, in <module>
+  File "C:\Users\Akira\Documents\GitHub\finance_control\src\python\GetPriceCoinSpecific.py", line 76, in <module>
     print(f"\u2705 Inserted price for {name:<25} USD={usd:.8f} BRL={brl:.8f}")
     ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.1520.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
@@ -10,7 +10,7 @@ UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
-  File "C:\Users\Akira\Documents\GitHub\finance_control\src\python\GetPriceCoins.py", line 77, in <module>
+  File "C:\Users\Akira\Documents\GitHub\finance_control\src\python\GetPriceCoinSpecific.py", line 83, in <module>
     print(f"\u274c Error inserting price for {name} ({symbol}): {e}")
     ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.1520.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
