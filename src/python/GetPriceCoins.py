@@ -8,7 +8,7 @@ from decimal import Decimal, ROUND_HALF_UP
 conn = psycopg2.connect(
     host="localhost",
     port=5432,
-    dbname="finances_Dev",         # 🔁 Change this
+    dbname="finances",         # 🔁 Change this
     user="postgres",         # 🔁 Change this
     password="p0w2i8"  # 🔁 Change this
 )

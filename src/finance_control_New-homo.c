@@ -4154,7 +4154,7 @@ WINDOWS:
 
     --gcc -o finance_control_New finance_control_New.c -I "C:\Program Files\PostgreSQL\<version>\include" -L "C:\Program Files\PostgreSQL\<version>\lib" -lpq
 
-    gcc -o finance_control_New-dev finance_control_New-dev.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
+    gcc -o finance_control_New-homo finance_control_New-homo.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
 
 
 

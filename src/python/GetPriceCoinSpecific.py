@@ -16,7 +16,7 @@ input_coin_id = sys.argv[1]
 conn = psycopg2.connect(
     host="localhost",
     port=5432,
-    dbname="finances_Dev",
+    dbname="finances",
     user="postgres",
     password="p0w2i8"
 )

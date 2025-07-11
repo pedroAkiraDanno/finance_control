@@ -13,6 +13,9 @@
 
 
 
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,7 +28,7 @@
 #include <libpq-fe.h>
 #define _XOPEN_SOURCE 700
 #include <unistd.h>
-
+#include <math.h>
 
 
 
@@ -63,7 +66,16 @@ void viewDebitCards(PGconn *conn, int user_id);
 void updateDebitCard(PGconn *conn, int user_id);
 void addBudgetLimit(PGconn *conn, int user_id);
 void viewBudgetLimits(PGconn *conn, int user_id);
-
+// about invesmet and crypto 
+void investmentMenu(PGconn *conn, int user_id);
+void viewCryptoPortfolio(PGconn *conn, int user_id);
+void addCryptoCoin(PGconn *conn);
+void buyCrypto(PGconn *conn, int user_id);
+void sellCrypto(PGconn *conn, int user_id);
+void viewCryptoTransactions(PGconn *conn, int user_id);
+double get_usd_brl_rate(PGconn *conn);
+void updateCoinPrices(int coin_id);
+void update_usd_brl_rate();
 
 
 
@@ -104,7 +116,6 @@ void displayIntroduction() {
 
 
 
-
 void printMenu() {
     printf("1. Add Income (e.g., Salary)\n");
     printf("2. Add Expense\n");
@@ -135,16 +146,52 @@ void printMenu() {
     printf("27. Update Debit Card\n");  // New option  
     printf("28. Add Budget Limit\n");  // Changed from "Add Spending Limit"
     printf("29. View Budget Limits\n"); // Changed from "View Spending Limits"    
-    printf("30. Exit\n");
+    printf("30. Investment Menu\n");  // New investment option    
+    printf("31. Exit\n");
 }
 
 
 
 
+void investmentMenu(PGconn *conn, int user_id) {
+    int choice;
+    while (1) {
+        clearScreen();
+        printf("\n=== Investment Menu ===\n");
+        printf("1. View Crypto Portfolio\n");
+        printf("2. Add Crypto Coin\n");
+        printf("3. Buy Crypto\n");
+        printf("4. Sell Crypto\n");
+        printf("5. View Crypto Transactions\n");
+        printf("6. Return to Main Menu\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
 
-
-
-
+        switch (choice) {
+            case 1:
+                viewCryptoPortfolio(conn, user_id);
+                break;
+            case 2:
+                addCryptoCoin(conn);
+                break;
+            case 3:
+                buyCrypto(conn, user_id);
+                break;
+            case 4:
+                sellCrypto(conn, user_id);
+                break;
+            case 5:
+                viewCryptoTransactions(conn, user_id);
+                break;
+            case 6:
+                return;
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+        printf("Press Enter to continue...");
+        getchar(); getchar(); // Wait for Enter key
+    }
+}
 
 
 
@@ -425,14 +472,6 @@ void addTransaction(PGconn *conn, int user_id, const char *title, const char *de
 
 
 
-
-
-
-
-
-
-
-
 void addAccount(PGconn *conn, int user_id, const char *title_account, float balance, 
     int banks_company_id, const char *institution_name, 
     const char *agency_number, const char *account_number, 
@@ -454,13 +493,6 @@ return;
 PQclear(res);
 printf("Account added successfully!\n");
 }
-
-
-
-
-
-
-
 
 
 
@@ -570,19 +602,6 @@ void addIncome(PGconn *conn, const char *description, float amount, int category
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 void viewTransactions(PGconn *conn, int user_id) {
     char query[2048]; // Increased buffer size
     snprintf(query, sizeof(query),
@@ -656,13 +675,6 @@ void viewTransactions(PGconn *conn, int user_id) {
 
 
 
-
-
-
-
-
-
-
 // Function to view income
 void viewIncome(PGconn *conn) {
     const char *query = "SELECT i.id, i.description, i.amount, ci.name AS category, "
@@ -700,25 +712,6 @@ void viewIncome(PGconn *conn) {
     }
     PQclear(res);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -843,8 +836,6 @@ void addCreditCard(PGconn *conn) {
 
 
 
-
-
 void addBankCompany(PGconn *conn, const char *name, const char *location) {
     char query[256];
     snprintf(query, sizeof(query), 
@@ -886,7 +877,6 @@ void viewBankCompanies(PGconn *conn) {
     }
     PQclear(res);
 }
-
 
 
 
@@ -953,7 +943,6 @@ int loginUser(PGconn *conn, int *user_id) {
 
 
 
-
 // Function to record login activity
 void recordLoginActivity(PGconn *conn, int user_id) {
     char query[256];
@@ -991,8 +980,6 @@ void recordLogoutActivity(PGconn *conn, int user_id) {
     PQclear(res);
     printf("Logout activity recorded successfully!\n");
 }
-
-
 
 
 
@@ -1260,7 +1247,6 @@ void viewAccountTypes(PGconn *conn) {
 
 
 
-
 // Function to add a new spending limit
 void addSpendingLimit(PGconn *conn, int user_id) {
     int category_id;
@@ -1378,9 +1364,6 @@ void viewSpendingLimits(PGconn *conn, int user_id) {
 
 
 
-
-
-
 void generateInvoices(PGconn *conn, int user_id) {
     char current_date[11];
     getCurrentDate(current_date);
@@ -1465,8 +1448,6 @@ void generateInvoices(PGconn *conn, int user_id) {
     
     printf("Generated %d new invoices.\n", rows_affected);
 }
-
-
 
 
 
@@ -1949,10 +1930,6 @@ void updateDebitCard(PGconn *conn, int user_id) {
 
 
 
-
-
-
-
 // Function to add a new budget limit
 void addBudgetLimit(PGconn *conn, int user_id) {
     float amount;
@@ -2076,6 +2053,971 @@ void viewBudgetLimits(PGconn *conn, int user_id) {
 
 
 
+
+
+
+
+
+// CRIPTO FUNCTIONS ************************************************ CRIPTO FUNCTIONS
+
+
+// Function to view crypto portfolio
+void viewCryptoPortfolio(PGconn *conn, int user_id) {
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT c.name, c.symbol, w.quantity, w.average_buy_price, "
+        "w.total_value_usd, w.total_value_brl, a.title_account "
+        "FROM investment.crypto_wallets w "
+        "JOIN investment.crypto_coins c ON w.coin_id = c.coin_id "
+        "JOIN account a ON w.account_id = a.id "
+        "WHERE a.user_id = %d "
+        "ORDER BY w.total_value_usd DESC", user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No crypto holdings found.\n");
+    } else {
+        printf("Coin Name     | Symbol | Quantity    | Avg Buy Price | USD Value   | BRL Value   | Account\n");
+        printf("--------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%-12s | %-6s | %-11s | %-14s | %-11s | %-11s | %s\n",
+                   PQgetvalue(res, i, 0),  // Name
+                   PQgetvalue(res, i, 1),  // Symbol
+                   PQgetvalue(res, i, 2),  // Quantity
+                   PQgetvalue(res, i, 3),  // Avg Buy Price
+                   PQgetvalue(res, i, 4),  // USD Value
+                   PQgetvalue(res, i, 5),  // BRL Value
+                   PQgetvalue(res, i, 6)); // Account
+        }
+        
+        // Show total portfolio value
+        snprintf(query, sizeof(query),
+            "SELECT SUM(w.total_value_usd), SUM(w.total_value_brl) "
+            "FROM investment.crypto_wallets w "
+            "JOIN account a ON w.account_id = a.id "
+            "WHERE a.user_id = %d", user_id);
+        
+        PGresult *total_res = PQexec(conn, query);
+        if (PQresultStatus(total_res) == PGRES_TUPLES_OK && PQntuples(total_res) > 0) {
+            printf("\nTotal Portfolio Value: USD %s | BRL %s\n",
+                   PQgetvalue(total_res, 0, 0), PQgetvalue(total_res, 0, 1));
+        }
+        PQclear(total_res);
+    }
+    PQclear(res);
+}
+
+
+
+
+// Function to add a new crypto coin to the system
+void addCryptoCoin(PGconn *conn) {
+    char symbol[100], name[100], description[700];
+    
+    printf("Enter crypto symbol (e.g., BTC): ");
+    scanf(" %[^\n]", symbol);
+    printf("Enter crypto name (e.g., Bitcoin): ");
+    scanf(" %[^\n]", name);
+    printf("Enter description (optional): ");
+    scanf(" %[^\n]", description);
+
+    char query[512];
+    snprintf(query, sizeof(query),
+        "INSERT INTO investment.crypto_coins (symbol, name, description) "
+        "VALUES ('%s', '%s', '%s')",
+        symbol, name, description);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Failed to add crypto coin: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    PQclear(res);
+    printf("Crypto coin added successfully!\n");
+}
+
+
+/*
+double get_usd_brl_rate(PGconn *conn) {
+    PGresult *res = PQexec(conn,
+        "SELECT rate FROM exchange_rates WHERE currency_pair = 'USD/BRL' "
+        "ORDER BY last_updated DESC LIMIT 1");
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Failed to fetch exchange rate: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 5.0; // fallback if error occurs
+    }
+
+    double rate = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    return rate;
+}
+*/
+
+double get_usd_brl_rate(PGconn *conn) {
+    const char *query = "SELECT rate FROM exchange_rates WHERE currency_pair = 'USD/BRL' "
+                       "ORDER BY last_updated DESC LIMIT 1";
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Failed to fetch exchange rate: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 5.0; // Default fallback rate if error occurs
+    }
+
+    double rate = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    
+    if (rate <= 0) {
+        fprintf(stderr, "Invalid exchange rate: %.4f\n", rate);
+        return 5.0; // Default fallback rate if invalid
+    }
+    
+    return rate;
+}
+
+
+
+
+// Function to get current coin price from database
+double getCurrentCoinPrice(PGconn *conn, int coin_id, const char *currency) {
+    char query[256];
+    snprintf(query, sizeof(query),
+             "SELECT %s_price FROM investment.coin_prices "
+             "WHERE coin_id = %d ORDER BY price_timestamp DESC LIMIT 1",
+             (strcmp(currency, "USD") == 0) ? "usd" : "brl", coin_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        fprintf(stderr, "Failed to fetch current price: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return -1.0; // Return negative value to indicate error
+    }
+
+    double price = atof(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    return price;
+}
+
+
+
+
+// Function to update coin prices using Python script
+/*
+void updateCoinPrices() {
+    #ifdef _WIN32
+        system("python C:\\Users\\Akira\\Documents\\GitHub\\finance_control\\src\\python\\GetPriceCoins.py >nul 2> PriceCoinsErrors.log");
+    #else
+        system("python3 /path/to/GetPriceCoins.py >/dev/null 2> PriceCoinsErrors.log");
+    #endif
+}
+*/
+
+
+
+
+// Function to update coin prices using Python script
+void updateCoinPrices(int coin_id) {
+    char command[512];  // Allocate enough space for the full command
+
+    #ifdef _WIN32
+        // Format the command with the coin_id
+        snprintf(command, sizeof(command),
+            "python C:\\Users\\Akira\\Documents\\GitHub\\finance_control\\src\\python\\GetPriceCoinSpecific.py %d >nul 2> PriceCoinsErrors.log",
+            coin_id);
+    #else
+        snprintf(command, sizeof(command),
+            "python3 /path/to/GetPriceCoinSpecific.py %d >/dev/null 2> PriceCoinsErrors.log",
+            coin_id);
+    #endif
+
+    // Execute the command
+    system(command);
+}
+
+
+
+// Function to update coin prices using Python script
+void update_usd_brl_rate() {
+    char command[512];  // Allocate enough space for the full command
+
+    #ifdef _WIN32
+        // Format the command with the coin_id
+        snprintf(command, sizeof(command),
+            "python C:\\Users\\Akira\\Documents\\GitHub\\finance_control\\src\\python\\update_currency_rates.py >nul 2> update_currency_ratesErrors.log");
+    #else
+        snprintf(command, sizeof(command),
+            "python3 /path/to/update_currency_rates.py  >/dev/null 2> update_currency_ratesErrors.log" );
+    #endif
+
+    // Execute the command
+    system(command);
+}
+
+
+
+
+void buyCrypto(PGconn *conn, int user_id) {
+    int coin_id, account_id, buy_option;
+    double quantity = 0, amount = 0, amount_brl = 0, price_per_coin = 0, price_per_coin_brl = 0;
+    float brokerage_fee = 0;
+    char notes[700] = "";
+    char currency[4] = "BRL"; // Default to BRL
+    int use_current_price = 0;
+    int auto_fetch_price = 0;
+
+    update_usd_brl_rate(); // update update_usd_brl_rate by python    
+
+    // Show available coins
+    const char *coin_query = "SELECT coin_id, symbol, name FROM investment.crypto_coins ORDER BY symbol";
+    PGresult *coin_res = PQexec(conn, coin_query);
+    if (PQresultStatus(coin_res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Failed to fetch coins: %s", PQerrorMessage(conn));
+        PQclear(coin_res);
+        return;
+    }
+
+    printf("\nAvailable Cryptocurrencies:\n");
+    printf("ID | Symbol | Name\n");
+    printf("-------------------\n");
+    for (int i = 0; i < PQntuples(coin_res); i++) {
+        printf("%s | %-6s | %s\n",
+               PQgetvalue(coin_res, i, 0),
+               PQgetvalue(coin_res, i, 1),
+               PQgetvalue(coin_res, i, 2));
+    }
+
+    printf("\nEnter coin ID to buy: ");
+    if (scanf("%d", &coin_id) != 1 || coin_id <= 0) {
+        printf("Invalid coin ID.\n");
+        PQclear(coin_res);
+        return;
+    }
+
+    viewAccounts(conn, user_id);
+    printf("Enter account ID to use: ");
+    if (scanf("%d", &account_id) != 1 || account_id <= 0) {
+        printf("Invalid account ID.\n");
+        PQclear(coin_res);
+        return;
+    }
+
+    printf("\nSelect buy option:\n");
+    printf("1. Enter all details manually in BRL (quantity, price, amount)\n");
+    printf("2. Enter all details manually in USD (quantity, price, amount)\n");
+    printf("3. Enter amount in BRL and calculate quantity (manual price)\n");
+    printf("4. Enter amount in USD and calculate quantity (manual price)\n");
+    printf("5. Enter amount in BRL and calculate quantity (automatic price)\n");
+    printf("6. Enter amount in USD and calculate quantity (automatic price)\n");
+    printf("7. Use current market price with specific quantity\n");
+    printf("Enter your choice: ");
+    if (scanf("%d", &buy_option) != 1 || buy_option < 1 || buy_option > 7) {
+        printf("Invalid choice.\n");
+        PQclear(coin_res);
+        return;
+    }
+    printf("Enter brokerage fee (if any): ");
+    if (scanf("%f", &brokerage_fee) != 1 || brokerage_fee < 0) {
+        printf("Invalid brokerage fee.\n");
+        PQclear(coin_res);
+        return;
+    }
+
+    switch (buy_option) {
+        case 1: { // Manual entry in BRL
+            printf("Enter quantity to buy: ");
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
+            printf("Enter price per coin in BRL: ");
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+            amount_brl = quantity * price_per_coin_brl;
+
+            update_usd_brl_rate(); // update update_usd_brl_rate by python
+            
+            // Convert to USD with proper exchange rate handling
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual USD price entry.\n", exchange_rate);
+                printf("Enter price per coin in USD: ");
+                if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin = price_per_coin_brl / exchange_rate;
+            }
+            amount = quantity * price_per_coin;
+            strcpy(currency, "BRL");
+            break;
+        }
+            
+        case 2: { // Manual entry in USD
+            printf("Enter quantity to buy: ");
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
+            printf("Enter price per coin in USD: ");
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+            amount = quantity * price_per_coin;
+
+            update_usd_brl_rate(); // update update_usd_brl_rate by python
+            // Convert to BRL
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual BRL price entry.\n", exchange_rate);
+                printf("Enter price per coin in BRL: ");
+                if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin_brl = price_per_coin * exchange_rate;
+            }
+            amount_brl = quantity * price_per_coin_brl;
+            strcpy(currency, "USD");
+            break;
+        }
+            
+        case 3: { // BRL amount with manual price
+            printf("Enter amount in BRL to spend: ");
+            if (scanf("%lf", &amount_brl) != 1 || amount_brl <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
+            printf("Enter price per coin in BRL: ");
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+            quantity = amount_brl / price_per_coin_brl;
+            // Convert to USD
+            update_usd_brl_rate(); // update update_usd_brl_rate by python            
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual USD price entry.\n", exchange_rate);
+                printf("Enter price per coin in USD: ");
+                if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin = price_per_coin_brl / exchange_rate;
+            }
+            amount = quantity * price_per_coin;
+            strcpy(currency, "BRL");
+            break;
+        }
+            
+        case 4: { // USD amount with manual price
+            printf("Enter amount in USD to spend: ");
+            if (scanf("%lf", &amount) != 1 || amount <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
+            printf("Enter price per coin in USD: ");
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+            quantity = amount / price_per_coin;
+            // Convert to BRL
+            update_usd_brl_rate(); // update update_usd_brl_rate by python            
+            double exchange_rate = get_usd_brl_rate(conn);
+            if (exchange_rate <= 0) {
+                printf("Error: Invalid exchange rate (%.4f). Using manual BRL price entry.\n", exchange_rate);
+                printf("Enter price per coin in BRL: ");
+                if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                    printf("Invalid price.\n");
+                    PQclear(coin_res);
+                    return;
+                }
+            } else {
+                price_per_coin_brl = price_per_coin * exchange_rate;
+            }
+            amount_brl = quantity * price_per_coin_brl;
+            strcpy(currency, "USD");
+            break;
+        }
+            
+        case 5: { // BRL amount with automatic price
+            printf("Enter amount in BRL to spend: ");
+            if (scanf("%lf", &amount_brl) != 1 || amount_brl <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
+            strcpy(currency, "BRL");
+            auto_fetch_price = 1;
+            break;
+        }
+            
+        case 6: { // USD amount with automatic price
+            printf("Enter amount in USD to spend: ");
+            if (scanf("%lf", &amount) != 1 || amount <= 0) {
+                printf("Invalid amount.\n");
+                PQclear(coin_res);
+                return;
+            }
+            auto_fetch_price = 1;
+            break;
+        }
+            
+        case 7: { // Current market price
+            use_current_price = 1;
+            printf("Select currency (USD/BRL): ");
+            if (scanf("%3s", currency) != 1 || 
+                (strcmp(currency, "USD") != 0 && strcmp(currency, "BRL") != 0)) {
+                printf("Invalid currency. Using BRL.\n");
+                strcpy(currency, "BRL");
+            }
+            printf("Enter quantity to buy: ");
+            if (scanf("%lf", &quantity) != 1 || quantity <= 0) {
+                printf("Invalid quantity.\n");
+                PQclear(coin_res);
+                return;
+            }
+            break;
+        }
+            
+        default:
+            printf("Invalid option.\n");
+            PQclear(coin_res);
+            return;
+    }
+
+    // Fetch current price if needed
+    if (auto_fetch_price || use_current_price) {
+        updateCoinPrices(coin_id); // Update prices from external source
+        update_usd_brl_rate(); // Update update_usd_brl_rate
+        price_per_coin = getCurrentCoinPrice(conn, coin_id, "USD");
+        price_per_coin_brl = getCurrentCoinPrice(conn, coin_id, "BRL");
+        
+        if (price_per_coin <= 0 || price_per_coin_brl <= 0) {
+            printf("Failed to get current price. Using manual entry instead.\n");
+            printf("Enter price per coin in USD: ");
+            if (scanf("%lf", &price_per_coin) != 1 || price_per_coin <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+            printf("Enter price per coin in BRL: ");
+            if (scanf("%lf", &price_per_coin_brl) != 1 || price_per_coin_brl <= 0) {
+                printf("Invalid price.\n");
+                PQclear(coin_res);
+                return;
+            }
+        } else {
+            printf("Current price: %.8f USD | %.8f BRL\n", price_per_coin, price_per_coin_brl);
+        }
+
+        update_usd_brl_rate(); // update update_usd_brl_rate by python
+
+        if (auto_fetch_price) {
+            if (strcmp(currency, "BRL") == 0) {
+                quantity = amount_brl / price_per_coin_brl;
+                amount = quantity * price_per_coin;
+            } else {
+                quantity = amount / price_per_coin;
+                amount_brl = quantity * price_per_coin_brl;
+            }
+        } else {
+            if (strcmp(currency, "BRL") == 0) {
+                amount_brl = quantity * price_per_coin_brl;
+                amount = quantity * price_per_coin;
+            } else {
+                amount = quantity * price_per_coin;
+                amount_brl = quantity * price_per_coin_brl;
+            }
+        }
+    }
+
+    // Verify the calculated values are valid
+    if (quantity <= 0 || amount <= 0 || amount_brl <= 0 || 
+        price_per_coin <= 0 || price_per_coin_brl <= 0 ||
+        !isfinite(price_per_coin) || !isfinite(price_per_coin_brl)) {
+        printf("Error: Invalid calculated values. Transaction canceled.\n");
+        PQclear(coin_res);
+        return;
+    }
+
+    printf("\nTransaction Summary:\n");
+    printf("Coin ID: %d\n", coin_id);
+    printf("Quantity: %.8f\n", quantity);
+    printf("Price per coin: %.8f USD | %.8f BRL\n", price_per_coin, price_per_coin_brl);
+    printf("Total cost: %.2f USD | %.2f BRL\n", amount, amount_brl);
+    printf("Brokerage fee: %.2f\n", brokerage_fee);
+    printf("Account ID: %d\n", account_id);
+
+    printf("\nEnter notes (optional): ");
+    getchar();
+    fgets(notes, sizeof(notes), stdin);
+    notes[strcspn(notes, "\n")] = '\0';
+
+    // Confirm transaction
+    printf("\nConfirm this transaction? (1 for Yes, 0 for No): ");
+    int confirm;
+    if (scanf("%d", &confirm) != 1) {
+        printf("Invalid input. Transaction canceled.\n");
+        PQclear(coin_res);
+        return;
+    }
+    if (!confirm) {
+        printf("Transaction canceled.\n");
+        PQclear(coin_res);
+        return;
+    }
+
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        PQclear(coin_res);
+        return;
+    }
+    PQclear(res);
+
+    // Record transaction
+    char query[2048];
+    snprintf(query, sizeof(query),
+        "INSERT INTO investment.crypto_transactions "
+        "(account_id, coin_id, tx_type, quantity, price_per_coin, price_per_coin_brl, "
+        "amount, amount_brl, brokerage_fee, notes) "
+        "VALUES (%d, %d, 'BUY', %.10f, %.8f, %.8f, %.2f, %.2f, %.2f, '%s')",
+        account_id, coin_id, quantity, price_per_coin, price_per_coin_brl, 
+        amount, amount_brl, brokerage_fee, notes);
+
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Transaction recording failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(coin_res);
+        return;
+    }
+    PQclear(res);
+
+    // Update wallet
+    snprintf(query, sizeof(query),
+        "INSERT INTO investment.crypto_wallets "
+        "(account_id, coin_id, quantity, average_buy_price, total_value_usd, total_value_brl) "
+        "VALUES (%d, %d, %.10f, %.8f, %.2f, %.2f) "
+        "ON CONFLICT (account_id, coin_id) DO UPDATE SET "
+        "quantity = investment.crypto_wallets.quantity + EXCLUDED.quantity, "
+        "average_buy_price = (investment.crypto_wallets.quantity * investment.crypto_wallets.average_buy_price + "
+        "EXCLUDED.quantity * %.8f) / "
+        "(investment.crypto_wallets.quantity + EXCLUDED.quantity), "
+        "total_value_usd = investment.crypto_wallets.total_value_usd + %.2f, "
+        "total_value_brl = investment.crypto_wallets.total_value_brl + %.2f, "
+        "updated_at = CURRENT_TIMESTAMP",
+        account_id, coin_id, quantity, price_per_coin, amount, amount_brl,
+        price_per_coin, amount, amount_brl);
+
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Wallet update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(coin_res);
+        return;
+    }
+    PQclear(res);
+
+    // Update account balance (always deduct in BRL)
+    snprintf(query, sizeof(query),
+        "UPDATE account SET balance = balance - %.2f WHERE id = %d",
+        amount_brl + brokerage_fee, account_id);
+
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Account balance update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(coin_res);
+        return;
+    }
+    PQclear(res);
+
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        PQclear(coin_res);
+        return;
+    }
+    PQclear(res);
+    PQclear(coin_res);
+
+    printf("\nTransaction completed successfully!\n");
+    printf("Bought %.8f coins for %.2f BRL (%.2f USD)\n", 
+           quantity, amount_brl, amount);
+    printf("Including brokerage fee of %.2f\n", brokerage_fee);
+}
+
+
+
+
+
+
+
+
+
+
+void sellCrypto(PGconn *conn, int user_id) {
+    int coin_id, account_id, sell_option;
+    double quantity = 0, amount = 0, amount_brl = 0, price_per_coin = 0, price_per_coin_brl = 0;
+    float brokerage_fee = 0;
+    char notes[700] = "";
+    char currency[4] = "BRL"; // Default to BRL
+    int use_current_price = 0;
+
+    // Show user's crypto holdings
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT c.coin_id, c.symbol, c.name, w.quantity, w.average_buy_price "
+        "FROM investment.crypto_wallets w "
+        "JOIN investment.crypto_coins c ON w.coin_id = c.coin_id "
+        "JOIN account a ON w.account_id = a.id "
+        "WHERE a.user_id = %d AND w.quantity > 0 "
+        "ORDER BY c.symbol", user_id);
+    
+    PGresult *holdings_res = PQexec(conn, query);
+    if (PQresultStatus(holdings_res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Failed to fetch holdings: %s", PQerrorMessage(conn));
+        PQclear(holdings_res);
+        return;
+    }
+    
+    if (PQntuples(holdings_res) == 0) {
+        printf("You don't have any crypto holdings to sell.\n");
+        PQclear(holdings_res);
+        return;
+    }
+    
+    printf("Your Crypto Holdings:\n");
+    printf("ID | Symbol | Name       | Quantity    | Avg Buy Price\n");
+    printf("------------------------------------------------------\n");
+    for (int i = 0; i < PQntuples(holdings_res); i++) {
+        printf("%s | %-6s | %-10s | %-11s | %s\n",
+               PQgetvalue(holdings_res, i, 0),
+               PQgetvalue(holdings_res, i, 1),
+               PQgetvalue(holdings_res, i, 2),
+               PQgetvalue(holdings_res, i, 3),
+               PQgetvalue(holdings_res, i, 4));
+    }
+    
+    printf("\nEnter coin ID to sell: ");
+    scanf("%d", &coin_id);
+    
+    // Verify user has this coin
+    int valid_coin = 0;
+    double current_quantity = 0;
+    for (int i = 0; i < PQntuples(holdings_res); i++) {
+        if (atoi(PQgetvalue(holdings_res, i, 0)) == coin_id) {
+            valid_coin = 1;
+            current_quantity = atof(PQgetvalue(holdings_res, i, 3));
+            break;
+        }
+    }
+    
+    if (!valid_coin) {
+        printf("Invalid coin ID or you don't own this coin.\n");
+        PQclear(holdings_res);
+        return;
+    }
+
+    // Get account ID from wallet
+    snprintf(query, sizeof(query),
+        "SELECT account_id FROM investment.crypto_wallets "
+        "WHERE coin_id = %d AND account_id IN "
+        "(SELECT id FROM account WHERE user_id = %d) LIMIT 1",
+        coin_id, user_id);
+    
+    PGresult *account_res = PQexec(conn, query);
+    if (PQresultStatus(account_res) != PGRES_TUPLES_OK || PQntuples(account_res) == 0) {
+        fprintf(stderr, "Failed to get account: %s", PQerrorMessage(conn));
+        PQclear(account_res);
+        PQclear(holdings_res);
+        return;
+    }
+    
+    account_id = atoi(PQgetvalue(account_res, 0, 0));
+    PQclear(account_res);
+
+    printf("\nSelect sell option:\n");
+    printf("1. Enter quantity to sell and price in BRL\n");
+    printf("2. Enter quantity to sell and price in USD\n");
+    printf("3. Enter amount in BRL you want to receive (calculates quantity)\n");
+    printf("4. Enter amount in USD you want to receive (calculates quantity)\n");
+    printf("5. Sell all at current market price\n");
+    printf("Enter brokerage fee (if any): ");
+    scanf("%f", &brokerage_fee);
+    printf("Enter your choice: ");
+    scanf("%d", &sell_option);
+
+    switch (sell_option) {
+        case 1: // Quantity and price in BRL
+            printf("Enter quantity to sell (you have %.8f): ", current_quantity);
+            scanf("%lf", &quantity);
+            printf("Enter price per coin in BRL: ");
+            scanf("%lf", &price_per_coin_brl);
+            amount_brl = quantity * price_per_coin_brl;
+            price_per_coin = price_per_coin_brl / get_usd_brl_rate(conn);
+            amount = quantity * price_per_coin;
+            strcpy(currency, "BRL");
+            break;
+            
+        case 2: // Quantity and price in USD
+            printf("Enter quantity to sell (you have %.8f): ", current_quantity);
+            scanf("%lf", &quantity);
+            printf("Enter price per coin in USD: ");
+            scanf("%lf", &price_per_coin);
+            amount = quantity * price_per_coin;
+            price_per_coin_brl = price_per_coin * get_usd_brl_rate(conn);
+            amount_brl = quantity * price_per_coin_brl;
+            strcpy(currency, "USD");
+            break;
+            
+        case 3: // BRL amount
+            printf("Enter amount in BRL you want to receive: ");
+            scanf("%lf", &amount_brl);
+            printf("Enter price per coin in BRL: ");
+            scanf("%lf", &price_per_coin_brl);
+            quantity = amount_brl / price_per_coin_brl;
+            price_per_coin = price_per_coin_brl / get_usd_brl_rate(conn);
+            amount = quantity * price_per_coin;
+            strcpy(currency, "BRL");
+            break;
+            
+        case 4: // USD amount
+            printf("Enter amount in USD you want to receive: ");
+            scanf("%lf", &amount);
+            printf("Enter price per coin in USD: ");
+            scanf("%lf", &price_per_coin);
+            quantity = amount / price_per_coin;
+            price_per_coin_brl = price_per_coin * get_usd_brl_rate(conn);
+            amount_brl = quantity * price_per_coin_brl;
+            strcpy(currency, "USD");
+            break;
+            
+        case 5: // Sell all at current price
+            quantity = current_quantity;
+            printf("Select currency (USD/BRL): ");
+            scanf("%3s", currency);
+            
+            price_per_coin = getCurrentCoinPrice(conn, coin_id, "USD");
+            price_per_coin_brl = getCurrentCoinPrice(conn, coin_id, "BRL");
+            if (price_per_coin < 0 || price_per_coin_brl < 0) {
+                printf("Failed to get current price. Using manual entry instead.\n");
+                printf("Enter price per coin in USD: ");
+                scanf("%lf", &price_per_coin);
+                printf("Enter price per coin in BRL: ");
+                scanf("%lf", &price_per_coin_brl);
+            } else {
+                printf("Current price: %.8f USD | %.8f BRL\n", price_per_coin, price_per_coin_brl);
+            }
+            
+            if (strcmp(currency, "BRL") == 0) {
+                amount_brl = quantity * price_per_coin_brl;
+                amount = quantity * price_per_coin;
+            } else {
+                amount = quantity * price_per_coin;
+                amount_brl = quantity * price_per_coin_brl;
+            }
+            use_current_price = 1;
+            break;
+            
+        default:
+            printf("Invalid option.\n");
+            PQclear(holdings_res);
+            return;
+    }
+
+    // Validate quantity
+    if (quantity > current_quantity) {
+        printf("Error: You only have %.8f of this coin.\n", current_quantity);
+        PQclear(holdings_res);
+        return;
+    }
+
+    printf("\nTransaction Summary:\n");
+    printf("Coin ID: %d\n", coin_id);
+    printf("Quantity: %.8f\n", quantity);
+    printf("Price per coin: %.8f USD | %.8f BRL\n", price_per_coin, price_per_coin_brl);
+    printf("Total proceeds: %.2f USD | %.2f BRL\n", amount, amount_brl);
+    printf("Brokerage fee: %.2f\n", brokerage_fee);
+    printf("Account ID: %d\n", account_id);
+
+    printf("\nEnter notes (optional): ");
+    getchar();
+    fgets(notes, sizeof(notes), stdin);
+    notes[strcspn(notes, "\n")] = '\0';
+
+    // Confirm transaction
+    printf("\nConfirm this sale? (1 for Yes, 0 for No): ");
+    int confirm;
+    scanf("%d", &confirm);
+    if (!confirm) {
+        printf("Sale canceled.\n");
+        PQclear(holdings_res);
+        return;
+    }
+
+    // Start transaction
+    PGresult *res = PQexec(conn, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        PQclear(holdings_res);
+        return;
+    }
+    PQclear(res);
+    
+    // Record the sell transaction
+    snprintf(query, sizeof(query),
+        "INSERT INTO investment.crypto_transactions "
+        "(account_id, coin_id, tx_type, quantity, price_per_coin, price_per_coin_brl, "
+        "amount, amount_brl, brokerage_fee, notes) "
+        "VALUES (%d, %d, 'SELL', %.10f, %.8f, %.8f, %.2f, %.2f, %.2f, '%s')",
+        account_id, coin_id, quantity, price_per_coin, price_per_coin_brl, 
+        amount, amount_brl, brokerage_fee, notes);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Transaction recording failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(holdings_res);
+        return;
+    }
+    PQclear(res);
+    
+    // Update wallet (reduce quantity)
+    snprintf(query, sizeof(query),
+        "UPDATE investment.crypto_wallets "
+        "SET quantity = quantity - %.10f, "
+        "total_value_usd = (quantity - %.10f) * average_buy_price, "
+        "total_value_brl = (quantity - %.10f) * average_buy_price * %.2f, "
+        "updated_at = CURRENT_TIMESTAMP "
+        "WHERE account_id = %d AND coin_id = %d",
+        quantity, quantity, quantity, get_usd_brl_rate(conn), account_id, coin_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Wallet update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(holdings_res);
+        return;
+    }
+    PQclear(res);
+    
+    // Add to account balance (always in BRL)
+    snprintf(query, sizeof(query),
+        "UPDATE account SET balance = balance + %.2f WHERE id = %d",
+        amount_brl - brokerage_fee, account_id);
+    
+    res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Account balance update failed: %s", PQerrorMessage(conn));
+        PQexec(conn, "ROLLBACK");
+        PQclear(res);
+        PQclear(holdings_res);
+        return;
+    }
+    PQclear(res);
+    
+    // Commit transaction
+    res = PQexec(conn, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "COMMIT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        PQclear(holdings_res);
+        return;
+    }
+    PQclear(res);
+    PQclear(holdings_res);
+    
+    printf("\nSuccessfully sold %.8f of coin ID %d for %.2f BRL (%.2f USD)\n", 
+           quantity, coin_id, amount_brl, amount);
+    printf("After brokerage fee of %.2f\n", brokerage_fee);
+}
+
+
+
+
+
+// Function to view crypto transactions
+void viewCryptoTransactions(PGconn *conn, int user_id) {
+    char query[1024];
+    snprintf(query, sizeof(query),
+        "SELECT t.tx_id, c.symbol, c.name, t.tx_type, t.quantity, "
+        "t.price_per_coin, t.total_value, t.tx_date, t.notes, a.title_account "
+        "FROM investment.crypto_transactions t "
+        "JOIN investment.crypto_coins c ON t.coin_id = c.coin_id "
+        "JOIN account a ON t.account_id = a.id "
+        "WHERE a.user_id = %d "
+        "ORDER BY t.tx_date DESC", user_id);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+    
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        printf("No crypto transactions found.\n");
+    } else {
+        printf("ID  | Symbol | Name       | Type   | Quantity    | Price      | Total Value | Date                | Account         | Notes\n");
+        printf("------------------------------------------------------------------------------------------------------------------------\n");
+        for (int i = 0; i < rows; i++) {
+            printf("%-3s | %-6s | %-10s | %-6s | %-11s | %-10s | %-11s | %-19s | %-15s | %s\n",
+                   PQgetvalue(res, i, 0),  // ID
+                   PQgetvalue(res, i, 1),  // Symbol
+                   PQgetvalue(res, i, 2),  // Name
+                   PQgetvalue(res, i, 3),  // Type
+                   PQgetvalue(res, i, 4),  // Quantity
+                   PQgetvalue(res, i, 5),  // Price
+                   PQgetvalue(res, i, 6),  // Total Value
+                   PQgetvalue(res, i, 7),  // Date
+                   PQgetvalue(res, i, 9),  // Account
+                   PQgetvalue(res, i, 8)); // Notes
+        }
+    }
+    PQclear(res);
+}
 
 
 
@@ -2465,12 +3407,18 @@ int main() {
                 break;
             case 29: // View Budget Limits
                 viewBudgetLimits(conn, user_id);
-                break;                
-            case 30: // Exit
+                break;    
+            // In the main function's switch statement:
+            case 30: // Investment Menu
+                investmentMenu(conn, user_id);
+                break;
+            case 31: // Exit
                 // Record logout activity before exiting
                 recordLogoutActivity(conn, user_id);            
                 PQfinish(conn);
                 exit(0);
+
+                
             default:
                 printf("Invalid choice. Please try again.\n");
             }
@@ -3162,6 +4110,19 @@ POSTGRESQL:
 
 
 
+    -- INVESTIMENT 
+
+
+        -- Table: I_stonks_Current
+        -- Purpose: Stores the latest known values of various investment instruments (e.g., stocks)
+
+        CREATE TABLE I_stonks_Current (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            code VARCHAR(10) UNIQUE NOT NULL,
+            current_value NUMERIC(10, 2)
+        );
+
 
 
 
@@ -3200,7 +4161,7 @@ WINDOWS:
 
     --gcc -o finance_control_New finance_control_New.c -I "C:\Program Files\PostgreSQL\<version>\include" -L "C:\Program Files\PostgreSQL\<version>\lib" -lpq
 
-    gcc -o finance_control_New-dev finance_control_New-dev.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
+    gcc -o finance_control_New-prd finance_control_New-prd.c -I "C:\Program Files\PostgreSQL\16\include" -L "C:\Program Files\PostgreSQL\16\lib" -lpq
 
 
 
@@ -3245,6 +4206,8 @@ LINUX preparation:
 
 
 */
+
+
 
 
 

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 # Database configuration
 DB_CONFIG = {
-    'dbname': 'finances_Dev',
+    'dbname': 'finances',
     'user': 'postgres',
     'password': 'p0w2i8',
     'host': 'localhost',

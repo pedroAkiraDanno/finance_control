@@ -16,7 +16,7 @@ from datetime import datetime
 # Database configuration
 DB_CONFIG = {
     'host': 'localhost',
-    'database': 'finances_Dev',
+    'database': 'finances',
     'user': 'postgres',
     'password': 'p0w2i8'
 }

@@ -12,7 +12,7 @@ from pycoingecko import CoinGeckoAPI
 
 # 1. Connect to Postgres
 conn = psycopg2.connect(
-    host="localhost", port=5432, dbname="finances_Dev", user="postgres", password="p0w2i8"
+    host="localhost", port=5432, dbname="finances", user="postgres", password="p0w2i8"
 )
 cur = conn.cursor()
 cur.execute("""
